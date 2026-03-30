@@ -1,0 +1,27 @@
+package com.solarwise.capstonebackend.exception;
+
+import org.springframework.http.HttpStatus;
+
+/**
+ * 비즈니스 로직 예외
+ */
+public class BusinessException extends RuntimeException {
+
+    private final HttpStatus status;
+
+    public BusinessException(String message, HttpStatus status) {
+        super(message);
+        this.status = status;
+    }
+
+    public BusinessException(String message) {
+        super(message);
+        this.status = HttpStatus.BAD_REQUEST;
+    }
+
+    public HttpStatus getStatus() {
+        return status;
+    }
+
+}
+
