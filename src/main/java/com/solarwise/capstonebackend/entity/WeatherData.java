@@ -11,7 +11,7 @@ import java.time.LocalDateTime;
  */
 @Entity
 @Table(name = "weather_data", indexes = {
-        @Index(name = "idx_power_plant_timestamp", columnList = "power_plant_id,timestamp")
+        @Index(name = "idx_weather_data_power_plant_timestamp", columnList = "power_plant_id,timestamp")
 })
 @Data
 @Builder
@@ -51,4 +51,3 @@ public class WeatherData {
     }
 
 }
-
