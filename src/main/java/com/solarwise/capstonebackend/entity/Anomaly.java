@@ -11,7 +11,7 @@ import java.time.LocalDateTime;
  */
 @Entity
 @Table(name = "anomalies", indexes = {
-        @Index(name = "idx_power_plant_timestamp", columnList = "power_plant_id,detected_at")
+        @Index(name = "idx_anomalies_power_plant_detected_at", columnList = "power_plant_id,detected_at")
 })
 @Data
 @Builder
@@ -66,4 +66,3 @@ public class Anomaly {
     }
 
 }
-
