@@ -6,6 +6,7 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * 에너지 로그 저장소
@@ -14,6 +15,8 @@ import java.util.List;
 public interface EnergyLogRepository extends JpaRepository<EnergyLog, Long> {
 
     List<EnergyLog> findByPowerPlantIdAndTimestampBetween(Long powerPlantId, LocalDateTime start, LocalDateTime end);
+
+    Optional<EnergyLog> findTopByPowerPlantIdOrderByTimestampDesc(Long powerPlantId);
 
 }
 

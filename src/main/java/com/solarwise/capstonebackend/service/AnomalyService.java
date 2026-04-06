@@ -1,10 +1,10 @@
 package com.solarwise.capstonebackend.service;
 
 import com.solarwise.capstonebackend.dto.AnomalyDto;
+import com.solarwise.capstonebackend.entity.Anomaly;
 import com.solarwise.capstonebackend.repository.AnomalyRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -36,17 +36,17 @@ public class AnomalyService {
     /**
      * 엔티티를 DTO로 변환
      */
-    private AnomalyDto entityToDto(com.solarwise.capstonebackend.entity.Anomaly anomaly) {
+    private AnomalyDto entityToDto(Anomaly anomaly) {
         return AnomalyDto.builder()
-                .id(anomaly.getId())
-                .powerPlantId(anomaly.getPowerPlant().getId())
+                .eventId(anomaly.getId())
                 .type(anomaly.getType())
-                .description(anomaly.getDescription())
                 .severity(anomaly.getSeverity())
-                .xaiExplanation(anomaly.getXaiExplanation())
-                .status(anomaly.getStatus())
                 .detectedAt(anomaly.getDetectedAt())
-                .resolvedAt(anomaly.getResolvedAt())
+                .summary(anomaly.getSummary())
+                .status(anomaly.getStatus())
+                .cause(anomaly.getCause())
+                .recommendedAction(anomaly.getRecommendedAction())
+                .xaiExplanation(anomaly.getXaiExplanation())
                 .build();
     }
 

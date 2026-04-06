@@ -71,7 +71,7 @@ src/main/java/com/solarwise/capstonebackend/
 
 ## 🎯 핵심 기능별 구현 현황
 
-### 1️⃣ 인증/인가 시스템 (담당: 이승윤)
+### 1️⃣ 인증/인가 시스템 (담당 영역: 백엔드 API(이승윤))
 ✅ **완료된 항목:**
 - JWT 기반 토큰 생성 & 검증 (`JwtUtil.java`)
 - 무상태 세션 관리 (`SecurityConfig.java`)
@@ -82,7 +82,7 @@ src/main/java/com/solarwise/capstonebackend/
 - 회원가입 엔드포인트 추가
 - OAuth2 통합 (선택사항)
 
-### 2️⃣ 대시보드 & 데이터 집계 (담당: 이승윤)
+### 2️⃣ 대시보드 & 데이터 집계 (담당 영역: 백엔드 API(이승윤))
 ✅ **완료된 항목:**
 - 발전소별 대시보드 조회 엔드포인트 (`DashboardController.java`)
 - 집계 서비스 뼈대 (`EnergyAggregationService.java`)
@@ -92,7 +92,7 @@ src/main/java/com/solarwise/capstonebackend/
 - 시간별/일별 집계 로직 구현 (SQL GROUP BY)
 - 차트 데이터 포맷팅 (JSON 응답)
 
-### 3️⃣ AI 연계 & 데이터 파이프라인 (담당: 박채리)
+### 3️⃣ AI 연계 & 데이터 파이프라인 (담당 영역: AI/데이터 연동(박채리))
 ✅ **완료된 항목:**
 - AI 서버 통신 서비스 뼈대 (`AiIntegrationService.java`)
 - RestTemplate 설정 (`WebConfig.java`)
@@ -105,7 +105,7 @@ src/main/java/com/solarwise/capstonebackend/
 - AI 예측 결과 콜백 핸들링
 - SHAP/LIME XAI 텍스트 매핑 로직
 
-### 4️⃣ 이상 탐지 & 알림 엔진 (담당: 박채리)
+### 4️⃣ 이상 탐지 & 알림 엔진 (담당 영역: AI/데이터 연동(박채리))
 ✅ **완료된 항목:**
 - 이상 탐지 엔티티 & 저장소 (`Anomaly.java`, `AnomalyRepository.java`)
 - 이상 조회 서비스 (`AnomalyService.java`)
@@ -277,13 +277,13 @@ Database (MySQL)
 
 ## ⚡ 다음 작업 항목
 
-### 박채리 (AI/Data 담당)
+### AI/데이터 연동 영역(박채리)
 1. `AiIntegrationService` 에서 AI 서버 API 호출 구현
 2. 공공 데이터 포털 기상 데이터 수집 배치 작성
 3. CSV 데이터 초기 적재 로직 구현
 4. SHAP/LIME XAI 설명 텍스트 매핑
 
-### 이승윤 (인증/대시보드 담당)
+### 백엔드 API 영역(이승윤)
 1. 회원가입 엔드포인트 추가
 2. `EnergyAggregationService` 에 시간별/일별 집계 쿼리 작성
 3. 이상 감지 알림 엔진 구현 (임계치 로직)

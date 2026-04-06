@@ -35,3 +35,11 @@ out/
 
 ### VS Code ###
 .vscode/
+
+### 개인 DB 설정 (GitHub에 올리지 않음) ###
+# 각자 로컬 환경에 맞게 설정하는 파일이므로 GitHub에 올리지 않습니다.
+# application-mysql.properties.example 파일을 복사해서 사용하세요.
+application-mysql.properties
+application-local.properties
+application-prod.properties
+
