@@ -29,7 +29,16 @@ public class EnergyLog {
     private PowerPlant powerPlant;
 
     @Column(nullable = false)
-    private Double actualGeneration; // 실제 발전량 (kWh)
+    private Double powerKw; // 실제 발전 전력 (kW)
+
+    @Column(nullable = false)
+    private Double temperature; // 온도 (℃)
+
+    @Column(nullable = false)
+    private Double irradiance; // 일사량 (W/m²)
+
+    @Column(nullable = false)
+    private Double humidity; // 습도 (%)
 
     @Column
     private Double predictedGeneration; // AI 예측 발전량 (kWh)

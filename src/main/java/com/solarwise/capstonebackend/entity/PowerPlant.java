@@ -31,10 +31,19 @@ public class PowerPlant {
     private String location;
 
     @Column(nullable = false)
-    private Double capacity; // MW 단위
+    private Double capacity; // kW 단위
 
     @Column(nullable = false)
     private Integer panelCount; // 패널 개수
+
+    @Column(length = 100)
+    private String inverterModel; // 인버터 모델
+
+    @Column(length = 100)
+    private String sensorSerialNumber; // 센서 시리얼 번호
+
+    @Column(length = 50, columnDefinition = "VARCHAR(50) DEFAULT 'ACTIVE'")
+    private String status; // ACTIVE, INACTIVE 등
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
@@ -54,6 +63,9 @@ public class PowerPlant {
         createdAt = LocalDateTime.now();
         updatedAt = LocalDateTime.now();
         active = true;
+        if (status == null) {
+            status = "ACTIVE";
+        }
     }
 
     @PreUpdate

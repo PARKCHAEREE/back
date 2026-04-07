@@ -2,6 +2,8 @@ package com.solarwise.capstonebackend.service;
 
 import com.solarwise.capstonebackend.dto.LoginRequest;
 import com.solarwise.capstonebackend.dto.LoginResponse;
+import com.solarwise.capstonebackend.dto.SignupRequest;
+import com.solarwise.capstonebackend.dto.UserResponse;
 import com.solarwise.capstonebackend.entity.User;
 import com.solarwise.capstonebackend.exception.BusinessException;
 import com.solarwise.capstonebackend.repository.UserRepository;
@@ -13,7 +15,7 @@ import org.springframework.stereotype.Service;
 
 /**
  * 인증 서비스
- * - 사용자 로그인 처리
+ * - 사용자 회원가입, 로그인 처리
  * - JWT 토큰 발급
  */
 @Slf4j
@@ -24,6 +26,28 @@ public class AuthService {
     private final UserRepository userRepository;
     private final JwtUtil jwtUtil;
     private final PasswordEncoder passwordEncoder;
+
+    /**
+     * 사용자 회원가입
+     */
+    public UserResponse signup(SignupRequest request) {
+        if (userRepository.findByEmail(request.getEmail()).isPresent()) {
+            throw new BusinessException("이미 가입된 이메일입니다.");
+        }
+
+        User user = User.builder()
+                .email(request.getEmail())
+                .password(passwordEncoder.encode(request.getPassword()))
+                .name(request.getName())
+                .role(request.getRole())
+                .active(true)
+                .build();
+
+        User savedUser = userRepository.save(user);
+        log.info("사용자 회원가입: userId={}, email={}", savedUser.getId(), savedUser.getEmail());
+
+        return entityToUserResponse(savedUser);
+    }
 
     /**
      * 사용자 로그인
@@ -40,14 +64,36 @@ public class AuthService {
             throw new BusinessException("비활성화된 사용자입니다.");
         }
 
-        String token = jwtUtil.generateToken(user.getId().toString());
+        String accessToken = jwtUtil.generateToken(user.getId().toString());
+
+        log.info("사용자 로그인: userId={}, email={}", user.getId(), user.getEmail());
 
         return LoginResponse.builder()
+                .accessToken(accessToken)
+                .refreshToken(null) // TODO: 리프레시 토큰 구현
+                .user(entityToUserResponse(user))
+                .build();
+    }
+
+    /**
+     * 사용자 정보 조회 (로그인 후)
+     */
+    public UserResponse getUserInfo(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException("사용자를 찾을 수 없습니다."));
+
+        return entityToUserResponse(user);
+    }
+
+    /**
+     * 엔티티를 UserResponse로 변환
+     */
+    private UserResponse entityToUserResponse(User user) {
+        return UserResponse.builder()
                 .userId(user.getId())
-                .email(user.getEmail())
                 .name(user.getName())
+                .email(user.getEmail())
                 .role(user.getRole())
-                .token(token)
                 .build();
     }
 

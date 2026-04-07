@@ -14,11 +14,9 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class LoginResponse {
 
-    private Long userId;
-    private String email;
-    private String name;
-    private String token; // JWT 토큰
-    private String role;
+    private String accessToken; // JWT 액세스 토큰
+    private String refreshToken; // JWT 리프레시 토큰 (향후 추가)
+    private UserResponse user; // 사용자 정보
 
 }
 
