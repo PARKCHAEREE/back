@@ -29,7 +29,7 @@ public class WeatherController {
 
         Map<String, Double> weatherData = aiIntegrationService.fetchRealTimeWeather(nx, ny);
 
-        // 프론트랑 맞춘 공통 응답 포맷으로 감싸서 리턴
+        // 공통 응답 포맷으로 감싸서 리턴
         return ResponseEntity.ok(ApiResponse.success(weatherData, "실시간 기상 데이터 조회 성공"));
     }
 
