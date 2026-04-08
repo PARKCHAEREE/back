@@ -1,4 +1,4 @@
-# 백엔드 API 구현 현황 (2026-04-06)
+# 백엔드 API 구현 현황 (2026-04-08)
 
 ## 현재 진행 상황
 
@@ -21,25 +21,21 @@
 - 이상 탐지 목록 API
   - `GET /api/v1/plants/{plantId}/anomalies`
 
-### 🔄 Phase 3: 예측 API (대기)
-- 구현 필요:
+### ✅ Phase 3: AI 연동 및 데이터 파이프라인 (완료)
+- AI 예측 API 2종 구현
   - `GET /api/v1/plants/{plantId}/forecasts` - 예측 발전량
   - `GET /api/v1/plants/{plantId}/forecasts/explanations` - 예측 설명
-- 엔티티 필요:
-  - `Forecast` - 예측 데이터
-  - `ForecastExplanation` - XAI 설명
+- 데이터 파이프라인 API 2종 구현
+  - `POST /api/v1/plants/{plantId}/weather/upload-csv` - 과거 기상 데이터 CSV 업로드
+  - `GET /api/v1/weather/current` - 실시간 동네 날씨 조회
 
-### 🔄 Phase 4: 이상 탐지 상세 (대기)
+### 🔄 Phase 4: 이상 탐지 상세 및 예측 데이터 저장 (대기)
 - 구현 필요:
   - `GET /api/v1/plants/{plantId}/anomalies/{eventId}` - 상세 조회
   - `PATCH /api/v1/plants/{plantId}/anomalies/{eventId}/status` - 상태 변경
-
-### 🔄 Phase 5: AI 연동 (대기)
-- 구현 필요:
-  - AI 클라이언트 설정
-  - 예측 요청 비동기 처리
-  - 이미지 분석 API
-  - 비동기 작업 큐
+- 엔티티 필요:
+  - `Forecast` - 예측 데이터 저장
+  - `ForecastExplanation` - XAI 설명 저장
 
 ### 🔄 Phase 6: 챗 및 알림 (대기)
 - 구현 필요:
@@ -78,13 +74,13 @@
 - 🔄 이상 탐지 상세 API
 - 🔄 데이터 모델 정리 및 엔티티 추가
 
-### AI/데이터 연동 영역(박채리) (예상)
-- 🔄 예측 API 구현
-- 🔄 AI 클라이언트 설계
-- 🔄 비동기 처리 및 작업 큐
-- 🔄 이미지 분석 API
-- 🔄 챗/XAI 연동
-- 🔄 알림 발송 정책
+### AI/데이터 연동 영역(박채리)
+- ✅ AI 클라이언트 설계 및 구현 (`AiIntegrationService`)
+- ✅ 예측 API 구현 (`ForecastController`)
+- ✅ 데이터 파이프라인 구현 (`WeatherController`, CSV 업로드)
+- 🔄 예측 데이터 저장 로직 구현
+- 🔄 AI 연동 로직 비동기 처리
+- 🔄 다음 AI 기능 연동 (이상 탐지)
 
 ## 파일 구조
 
@@ -95,15 +91,17 @@ src/main/java/com/solarwise/capstonebackend/
 │   ├── UserController.java          [v1/users - 내 정보]
 │   ├── PlantController.java         [v1/plants - 발전소]
 │   ├── DashboardController.java     [v1/plants/{id} - 대시보드, 측정]
-│   └── AnomalyController.java       [v1/plants/{id}/anomalies - 이상]
+│   ├── AnomalyController.java       [v1/plants/{id}/anomalies - 이상]
+│   ├── ForecastController.java      [v1/plants/{id}/forecasts - 예측]
+│   └── WeatherController.java       [v1/weather, v1/plants/{id}/weather - 날씨]
 │
 ├── service/
 │   ├── AuthService.java             [회원가입, 로그인, 사용자 정보]
 │   ├── PlantService.java            [발전소 조회]
 │   ├── MeasurementService.java       [측정 데이터, 대시보드]
 │   ├── AnomalyService.java          [이상 탐지 조회]
-│   ├── EnergyAggregationService.java [에너지 집계 - TODO]
-│   └── AiIntegrationService.java    [AI 연동 - TODO]
+│   ├── EnergyAggregationService.java [에너지 집계 - 🔄]
+│   └── AiIntegrationService.java    [AI 연동 - ✅]
 │
 ├── entity/
 │   ├── User.java
@@ -115,6 +113,11 @@ src/main/java/com/solarwise/capstonebackend/
 ├── dto/
 │   ├── ApiResponse.java
 │   ├── ApiErrorResponse.java
+│   ├── ai/
+│   │   ├── AiApiResponse.java
+│   │   ├── AiPredictionRequest.java
+│   │   ├── AiPredictionResponse.java
+│   │   └── XaiExplanationResponse.java
 │   ├── SignupRequest.java
 │   ├── LoginRequest.java
 │   ├── LoginResponse.java
@@ -258,5 +261,4 @@ src/main/java/com/solarwise/capstonebackend/
 - 백엔드 작업 계획: `docs/planning/backend-work-plan.md`
 - Phase 1 상세: `docs/progress/IMPLEMENTATION_PHASE_1.md`
 - Phase 2 상세: `docs/progress/IMPLEMENTATION_PHASE_2.md`
-
-
+- Phase 3 상세: `docs/progress/IMPLEMENTATION_Phase_3.md` 

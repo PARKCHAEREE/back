@@ -2,7 +2,6 @@ package com.solarwise.capstonebackend.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
-
 import java.time.LocalDateTime;
 
 /**
