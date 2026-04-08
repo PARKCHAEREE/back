@@ -11,7 +11,7 @@ import java.time.LocalDateTime;
  */
 @Entity
 @Table(name = "anomalies", indexes = {
-        @Index(name = "idx_power_plant_timestamp", columnList = "power_plant_id,detected_at")
+        @Index(name = "idx_anomalies_power_plant_detected_at", columnList = "power_plant_id,detected_at")
 })
 @Data
 @Builder
@@ -28,18 +28,27 @@ public class Anomaly {
     private PowerPlant powerPlant;
 
     @Column(nullable = false, length = 50)
-    private String type; // GENERATION_DECREASE, PANEL_DEFECT, SOILING, etc.
+    private String type; // POWER, VISION
 
     @Column(nullable = false, length = 255)
-    private String description;
+    private String summary; // 요약
 
-    @Column(nullable = false)
-    private Double severity; // 심각도 (0~1)
+    @Column(length = 500)
+    private String description; // 상세 설명
+
+    @Column(nullable = false, length = 50)
+    private String severity; // LOW, MEDIUM, HIGH
+
+    @Column(length = 500)
+    private String cause; // 원인
+
+    @Column(length = 500)
+    private String recommendedAction; // 권장 조치
 
     @Column(columnDefinition = "LONGTEXT")
     private String xaiExplanation; // SHAP/LIME 기반 설명 가능한 AI
 
-    @Column(length = 50)
+    @Column(length = 50, columnDefinition = "VARCHAR(50) DEFAULT 'DETECTED'")
     private String status; // DETECTED, ACKNOWLEDGED, RESOLVED
 
     @Column(nullable = false)
@@ -58,6 +67,9 @@ public class Anomaly {
     protected void onCreate() {
         createdAt = LocalDateTime.now();
         updatedAt = LocalDateTime.now();
+        if (status == null) {
+            status = "DETECTED";
+        }
     }
 
     @PreUpdate
@@ -66,4 +78,3 @@ public class Anomaly {
     }
 
 }
-
