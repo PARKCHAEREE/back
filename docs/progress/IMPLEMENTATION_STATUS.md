@@ -37,6 +37,14 @@
   - `Forecast` - 예측 데이터 저장
   - `ForecastExplanation` - XAI 설명 저장
 
+### 🔄 Phase 5: 이미지 분석 및 백그라운드 처리 (대기)
+- 구현 필요:
+  - `POST /api/v1/plants/{plantId}/vision/analyze` - 패널 이미지 분석 (AI 연동)
+  - AI 연동 로직 비동기 처리 (대용량/장시간 처리 대비)
+  - `EnergyAggregationService` 시간별/일별 데이터 집계 배치 스케줄러 구현
+- 엔티티 필요:
+  - `VisionAnalysis` - 이미지 분석 결과 및 XAI 신뢰도 저장
+
 ### 🔄 Phase 6: 챗 및 알림 (대기)
 - 구현 필요:
   - `POST /api/v1/plants/{plantId}/chat/sessions` - 세션 생성
@@ -79,7 +87,7 @@
 - ✅ 예측 API 구현 (`ForecastController`)
 - ✅ 데이터 파이프라인 구현 (`WeatherController`, CSV 업로드)
 - 🔄 예측 데이터 저장 로직 구현
-- 🔄 AI 연동 로직 비동기 처리
+- 🔄 AI 연동 비동기 처리
 - 🔄 다음 AI 기능 연동 (이상 탐지)
 
 ## 파일 구조
@@ -222,9 +230,9 @@ src/main/java/com/solarwise/capstonebackend/
 3. 기본 테스트 추가
 
 ### P1 (다음주)
-1. 예측 발전량 API
-2. 예측 설명 (XAI) API
-3. AI 클라이언트 초안 작성
+1. 실시간 발전량 vs 예측값 비교 로직 (이상 감지 엔진)
+2. 기상청 API 연동 주기적 수집 스케줄러
+3. 예측 결과 및 XAI 설명 DB 저장 로직 (엔티티 스키마 확정 후)
 
 ### P2 (2주차)
 1. 이미지 분석 API
@@ -261,4 +269,4 @@ src/main/java/com/solarwise/capstonebackend/
 - 백엔드 작업 계획: `docs/planning/backend-work-plan.md`
 - Phase 1 상세: `docs/progress/IMPLEMENTATION_PHASE_1.md`
 - Phase 2 상세: `docs/progress/IMPLEMENTATION_PHASE_2.md`
-- Phase 3 상세: `docs/progress/IMPLEMENTATION_Phase_3.md` 
+- Phase 3 상세: `docs/progress/IMPLEMENTATION_Phase_3.md`
