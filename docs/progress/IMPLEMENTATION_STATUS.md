@@ -84,11 +84,14 @@
 
 ### AI/데이터 연동 영역(박채리)
 - ✅ AI 클라이언트 설계 및 구현 (`AiIntegrationService`)
-- ✅ 예측 API 구현 (`ForecastController`)
+- ✅ 예측 API 및 XAI 연동 구현 (`ForecastController`)
 - ✅ 데이터 파이프라인 구현 (`WeatherController`, CSV 업로드)
-- 🔄 예측 데이터 저장 로직 구현
-- 🔄 AI 연동 비동기 처리
-- 🔄 다음 AI 기능 연동 (이상 탐지)
+- 🔄 실시간 발전량 vs 예측값 비교 로직 (이상 감지 엔진)
+- 🔄 예측 결과 및 XAI 설명 DB 저장 로직
+- 🔄 기상청 API 연동 주기적 수집 스케줄러
+- 🔄 이미지 분석 API 구축 (`VisionAnalysis`) 및 비동기 처리
+- 🔄 챗 세션/메시지 API 구축 
+- 🔄 알림 설정 및 발송 정책 구현
 
 ## 파일 구조
 
