@@ -1,110 +1,212 @@
-# CODE_FILE_GUIDE
+# 📁 SolarWise Backend - 코드 파일 역할 가이드
 
-이 문서는 `CapstoneBackend`의 코드 파일을 빠르게 이해하기 위한 파일별 설명서입니다.
+> **프로젝트**: CapstoneBackend (SolarWise - 태양광 발전 관리 시스템)  
+> **최종 업데이트**: 2026-04-12  
+> **기술 스택**: Spring Boot 4.0.5 · Java 21 · Spring Security · JPA · JWT
 
-## 1) 전체 흐름 한눈에 보기
+---
 
-- 요청 진입: `controller/*`
-- 인증 처리: `security/JwtAuthenticationFilter.java` + `security/JwtUtil.java`
-- 비즈니스 로직: `service/*`
-- DB 접근: `repository/*`
-- 데이터 모델: `entity/*`
-- 응답 포맷/전달 객체: `dto/*`
-- 공통 예외 처리: `exception/GlobalExceptionHandler.java`
+## 📌 전체 패키지 구조
 
-기본 실행 프로필은 `swagger`이며(`src/main/resources/application.properties`), MySQL 없이 H2로 Swagger 확인이 가능하게 구성되어 있습니다.
+```
+com.solarwise.capstonebackend/
+├── CapstoneBackendApplication.java   ← 앱 진입점
+├── config/                           ← 애플리케이션 설정
+├── controller/                       ← HTTP 요청 처리 (REST API)
+├── dto/                              ← 요청/응답 데이터 형식 정의
+│   └── ai/                           ← AI 서버 전용 DTO
+├── entity/                           ← DB 테이블과 매핑되는 JPA 엔티티
+├── exception/                        ← 예외 클래스 및 전역 처리
+├── repository/                       ← DB 쿼리 인터페이스 (Spring Data JPA)
+├── security/                         ← JWT 인증/인가 처리
+├── service/                          ← 핵심 비즈니스 로직
+└── util/                             ← 공통 유틸리티
+```
 
-## 2) 엔트리/설정 파일
+---
 
-- `src/main/java/com/solarwise/capstonebackend/CapstoneBackendApplication.java`: Spring Boot 메인 실행 클래스.
-- `build.gradle`: Java 21, Spring Boot 4.0.5, JPA/Security/Swagger/JWT/OpenCSV/H2/MySQL 의존성 정의.
-- `src/main/resources/application.properties`: 공통 설정 + 기본 프로필(`swagger`) + JWT/로그/포트 설정.
-- `src/main/resources/application-swagger.properties`: H2 메모리 DB 기반 로컬 확인용 설정.
-- `src/main/resources/application-mysql.properties`: MySQL 연결 설정(로컬 비공개 파일).
-- `src/main/resources/application-mysql.properties.example`: MySQL 설정 템플릿.
-- `src/main/java/com/solarwise/capstonebackend/config/SwaggerConfig.java`: OpenAPI 정보와 Bearer 인증 스키마 등록.
-- `src/main/java/com/solarwise/capstonebackend/config/WebConfig.java`: `/api/**` CORS 허용 + `RestTemplate` 빈 등록.
+## 🚀 진입점
 
-## 3) 보안/인증
+### `CapstoneBackendApplication.java`
+- Spring Boot 애플리케이션의 **시작점**
+- `@SpringBootApplication`으로 자동 설정, 컴포넌트 스캔, JPA 활성화
+- `main()` 메서드를 통해 내장 Tomcat 서버 실행
 
-- `src/main/java/com/solarwise/capstonebackend/security/SecurityConfig.java`: 무상태(Stateless) 보안 정책, 인증 제외 경로(`auth`, Swagger), JWT 필터 체인 등록.
-- `src/main/java/com/solarwise/capstonebackend/security/JwtAuthenticationFilter.java`: `Authorization: Bearer ...` 토큰 추출/검증 후 `SecurityContext`에 사용자 ID 저장.
-- `src/main/java/com/solarwise/capstonebackend/security/JwtUtil.java`: 토큰 생성(`generateToken`), 사용자 ID 추출, 유효성 검증.
+---
 
-## 4) 컨트롤러 (실제 API 진입점)
+## ⚙️ config/ — 애플리케이션 설정
 
-- `src/main/java/com/solarwise/capstonebackend/controller/AuthController.java`: 회원가입/로그인/로그아웃 (`/api/v1/auth/*`).
-- `src/main/java/com/solarwise/capstonebackend/controller/UserController.java`: 내 정보 조회 (`GET /api/v1/users/me`).
-- `src/main/java/com/solarwise/capstonebackend/controller/PlantController.java`: 발전소 목록/상세 조회 (`/api/v1/plants`).
-- `src/main/java/com/solarwise/capstonebackend/controller/DashboardController.java`: 대시보드 요약, 시계열 측정 조회 (`/api/v1/plants/{plantId}/*`).
-- `src/main/java/com/solarwise/capstonebackend/controller/AnomalyController.java`: 이상 탐지 목록 조회 (`/api/v1/plants/{plantId}/anomalies`).
+| 파일 | 역할 |
+|------|------|
+| `SwaggerConfig.java` | Swagger(OpenAPI) UI 설정. API 문서 제목·버전·설명을 구성하고, **JWT Bearer 인증 스키마**를 Swagger UI에 등록하여 토큰 인증 테스트를 가능하게 함 |
+| `WebConfig.java` | **CORS 설정** (프론트엔드 → 백엔드 교차 출처 허용) 및 외부 AI/기상청 서버와 통신하기 위한 `RestTemplate` Bean 등록 |
+| `DataInitConfig.java` | 앱 **최초 실행 시 테스트 데이터 자동 생성**. 관리자 계정(`admin@solarwise.com`)과 샘플 발전소("서울 1호 태양광")를 DB에 삽입 (이미 존재하면 건너뜀) |
 
-공통 패턴: 로그인 사용자 ID를 `SecurityContextHolder`에서 꺼내 서비스에 전달합니다.
+---
 
-## 5) 서비스 (핵심 로직)
+## 🌐 controller/ — REST API 엔드포인트
 
-- `src/main/java/com/solarwise/capstonebackend/service/AuthService.java`: 회원가입, 비밀번호 검증 로그인, JWT 발급, 사용자 정보 변환.
-- `src/main/java/com/solarwise/capstonebackend/service/PlantService.java`: 사용자 소유 발전소 목록/상세 조회.
-- `src/main/java/com/solarwise/capstonebackend/service/MeasurementService.java`: 대시보드 요약(현재전력/금일발전량/최근이상), 기간별 계측 시계열 조회.
-- `src/main/java/com/solarwise/capstonebackend/service/AnomalyService.java`: 이상 이벤트 조회 및 `AnomalyDto` 변환.
-- `src/main/java/com/solarwise/capstonebackend/service/AiIntegrationService.java`: AI 서버 연동 자리(예측 요청 TODO), 예측값 DB 반영.
-- `src/main/java/com/solarwise/capstonebackend/service/EnergyAggregationService.java`: 집계 로직 자리(TODO, 현재 빈 리스트 반환).
-- `src/main/java/com/solarwise/capstonebackend/service/DashboardService.java`: 집계+이상을 묶는 대시보드 조합 서비스(현재 컨트롤러 직접 연결은 아님).
+> 모든 컨트롤러는 `@RestController`로 JSON 응답을 반환하며, JWT 인증이 필요한 API에는 `@PreAuthorize("isAuthenticated()")`가 적용됩니다.
 
-## 6) 엔티티 (DB 테이블 모델)
+| 파일 | 기본 경로 | 역할 |
+|------|-----------|------|
+| `AuthController.java` | `/api/v1/auth` | **회원가입** (`POST /signup`), **로그인** (`POST /login`, JWT 발급), **로그아웃** (`POST /logout`) |
+| `UserController.java` | `/api/v1/users` | 로그인한 사용자의 **내 정보 조회** (`GET /me`) |
+| `PlantController.java` | `/api/v1/plants` | 내 **발전소 목록 조회** (`GET /`), **발전소 상세 조회** (`GET /{plantId}`) |
+| `DashboardController.java` | `/api/v1/plants/{plantId}` | **대시보드 요약** 조회 (`GET /dashboard/summary`), 기간별 **시계열 측정 데이터** 조회 (`GET /measurements`) |
+| `AnomalyController.java` | `/api/v1/plants/{plantId}/anomalies` | 발전소의 **이상 탐지 이벤트 목록** 조회 (최신순, 건수 제한 가능) |
+| `ForecastController.java` | `/api/v1/plants/{plantId}/forecasts` | AI 서버로부터 **발전량 예측 결과 조회** (`GET /`), **XAI 예측 근거 조회** (`GET /explanations`) |
+| `WeatherController.java` | `/api/v1` | 기상청 API를 통한 **실시간 날씨 조회** (`GET /weather/current`), **과거 기상 데이터 CSV 업로드** (`POST /plants/{plantId}/weather/upload-csv`) |
 
-- `src/main/java/com/solarwise/capstonebackend/entity/User.java`: 사용자 계정(`users`), 생성/수정 시각 자동 설정.
-- `src/main/java/com/solarwise/capstonebackend/entity/PowerPlant.java`: 발전소(`power_plants`), `User`와 `ManyToOne`.
-- `src/main/java/com/solarwise/capstonebackend/entity/EnergyLog.java`: 발전/환경 시계열(`energy_logs`), 발전소+시간 인덱스.
-- `src/main/java/com/solarwise/capstonebackend/entity/Anomaly.java`: 이상 이벤트(`anomalies`), 심각도/원인/XAI 설명 포함.
-- `src/main/java/com/solarwise/capstonebackend/entity/WeatherData.java`: 기상 데이터(`weather_data`), 발전소+시간 인덱스.
+---
 
-## 7) 리포지토리 (JPA 쿼리 경로)
+## 🗂️ dto/ — 데이터 전송 객체 (Data Transfer Object)
 
-- `src/main/java/com/solarwise/capstonebackend/repository/UserRepository.java`: `findByEmail`.
-- `src/main/java/com/solarwise/capstonebackend/repository/PowerPlantRepository.java`: `findByUserId`, `findByIdAndUserId`.
-- `src/main/java/com/solarwise/capstonebackend/repository/EnergyLogRepository.java`: 기간 조회, 최신 로그 조회.
-- `src/main/java/com/solarwise/capstonebackend/repository/AnomalyRepository.java`: 발전소별 이상 최신순 조회, 상태별 조회.
-- `src/main/java/com/solarwise/capstonebackend/repository/WeatherDataRepository.java`: 기상 데이터 기간 조회.
+> Entity를 직접 노출하지 않고, API 요청/응답에 필요한 데이터만 담는 객체들입니다.
 
-## 8) DTO (요청/응답 모델)
+### 공통 응답 형식
+| 파일 | 역할 |
+|------|------|
+| `ApiResponse<T>` | **성공 응답 공통 래퍼**. `{ success: true, data: ..., message: ... }` 형식으로 모든 성공 응답을 통일 |
+| `ApiErrorResponse` | **실패 응답 공통 래퍼**. `{ success: false, error: { code, message, details } }` 형식. 필드 검증 오류 상세 내용도 포함 가능 |
 
-### 공통 응답
-- `src/main/java/com/solarwise/capstonebackend/dto/ApiResponse.java`: 성공 응답 표준 래퍼.
-- `src/main/java/com/solarwise/capstonebackend/dto/ApiErrorResponse.java`: 실패 응답 표준 래퍼(필드 에러 상세 포함).
+### 인증 관련
+| 파일 | 역할 |
+|------|------|
+| `LoginRequest` | 로그인 요청 바디 (email, password) |
+| `LoginResponse` | 로그인 응답 (accessToken, refreshToken, 사용자 정보) |
+| `SignupRequest` | 회원가입 요청 바디 (email, password, name, role) |
+| `UserResponse` | 사용자 정보 응답 (userId, name, email, role) |
 
-### 인증/사용자
-- `src/main/java/com/solarwise/capstonebackend/dto/SignupRequest.java`: 회원가입 입력.
-- `src/main/java/com/solarwise/capstonebackend/dto/LoginRequest.java`: 로그인 입력.
-- `src/main/java/com/solarwise/capstonebackend/dto/LoginResponse.java`: 토큰 + 사용자 정보.
-- `src/main/java/com/solarwise/capstonebackend/dto/UserResponse.java`: 사용자 기본 정보.
+### 발전소 / 측정 데이터
+| 파일 | 역할 |
+|------|------|
+| `PlantResponse` | 발전소 정보 응답 (plantId, name, location, capacityKw, status 등) |
+| `DashboardSummaryDto` | 대시보드 요약 응답 (현재 발전량, 금일 발전량, 효율, 최근 이상 정보) |
+| `DashboardResponse` | 대시보드 전체 응답 (발전소 정보 + 집계 에너지 데이터 + 이상 목록) |
+| `MeasurementDto` | 단일 시점 측정값 (측정 시각, 전력kW, 온도, 일사량, 습도) |
+| `MeasurementSeriesDto` | 시계열 측정 데이터 목록 (plantId + MeasurementDto 리스트) |
+| `EnergyLogDto` | 에너지 로그 DTO (발전소ID, 전력kW, 타임스탬프 등) |
+| `AnomalyDto` | 이상 탐지 이벤트 응답 (유형, 심각도, 탐지 시각, 요약, 원인, 권장 조치, XAI 설명) |
 
-### 발전소/대시보드
-- `src/main/java/com/solarwise/capstonebackend/dto/PlantResponse.java`: 발전소 요약 정보.
-- `src/main/java/com/solarwise/capstonebackend/dto/MeasurementDto.java`: 단일 계측 포인트.
-- `src/main/java/com/solarwise/capstonebackend/dto/MeasurementSeriesDto.java`: 계측 시계열 묶음.
-- `src/main/java/com/solarwise/capstonebackend/dto/DashboardSummaryDto.java`: 대시보드 요약 카드용 데이터.
-- `src/main/java/com/solarwise/capstonebackend/dto/AnomalyDto.java`: 이상 이벤트 응답.
-- `src/main/java/com/solarwise/capstonebackend/dto/DashboardResponse.java`: 집계형 대시보드 응답(현재 일부만 사용).
-- `src/main/java/com/solarwise/capstonebackend/dto/EnergyLogDto.java`: 에너지 로그 DTO(현재 API 직접 사용 빈도 낮음).
+### AI 서버 전용 (`dto/ai/`)
+| 파일 | 역할 |
+|------|------|
+| `AiPredictionRequest` | AI 서버로 보내는 **발전량 예측 요청** DTO (plant_id, 날짜, 일사량, 기온, 모듈 온도, 풍속, 습도) |
+| `AiPredictionResponse` | AI 서버로부터 받는 **예측 결과** DTO (predicted_ac_power, confidence, drift_detected) |
+| `XaiExplanationResponse` | AI 서버로부터 받는 **XAI 설명 결과** DTO (예측 근거·피처 중요도 등) |
+| `AiApiResponse<T>` | AI 서버 응답 공통 래퍼 (status, data) |
 
-## 9) 예외/유틸
+---
 
-- `src/main/java/com/solarwise/capstonebackend/exception/BusinessException.java`: 비즈니스 오류 예외.
-- `src/main/java/com/solarwise/capstonebackend/exception/ResourceNotFoundException.java`: 조회 실패 예외.
-- `src/main/java/com/solarwise/capstonebackend/exception/GlobalExceptionHandler.java`: 예외를 `ApiErrorResponse` 형식으로 통합 처리.
-- `src/main/java/com/solarwise/capstonebackend/exception/ErrorResponse.java`: 레거시형 에러 DTO(현재 주 응답 포맷은 `ApiErrorResponse`).
-- `src/main/java/com/solarwise/capstonebackend/util/CsvParsingUtil.java`: OpenCSV 전체 읽기 유틸.
-- `src/main/java/com/solarwise/capstonebackend/util/WeatherDataFormatterUtil.java`: 기상청 응답 변환 자리(TODO 스텁 구현).
+## 🗃️ entity/ — JPA 엔티티 (DB 테이블 매핑)
 
-## 10) 테스트
+| 파일 | DB 테이블 | 역할 |
+|------|-----------|------|
+| `User.java` | `users` | **사용자(발전소 관리자)** 정보. email(고유), password(암호화), name, role(ADMIN/MANAGER/USER), active 상태 관리. `@PrePersist`/`@PreUpdate`로 생성·수정 시각 자동 기록 |
+| `PowerPlant.java` | `power_plants` | **태양광 발전소** 정보. name, location, capacity(kW), panelCount, inverterModel, sensorSerialNumber, status(ACTIVE/INACTIVE). User와 N:1 관계 |
+| `EnergyLog.java` | `energy_logs` | **실시간 발전량 시계열 데이터**. powerKw(실제 발전), temperature, irradiance, humidity, predictedGeneration(AI 예측값). PowerPlant와 N:1 관계. timestamp 인덱스로 빠른 범위 조회 지원 |
+| `WeatherData.java` | `weather_data` | **기상 데이터**. temperature, humidity, irradiance, cloudCover. PowerPlant와 N:1 관계. 기상청 API 또는 CSV 업로드로 적재됨 |
+| `Anomaly.java` | `anomalies` | **이상 탐지 이벤트**. type(POWER/VISION), severity(LOW/MEDIUM/HIGH), summary, cause, recommendedAction, xaiExplanation(SHAP/LIME 기반 AI 설명), status(DETECTED/ACKNOWLEDGED/RESOLVED). PowerPlant와 N:1 관계 |
 
-- `src/test/java/com/solarwise/capstonebackend/CapstoneBackendApplicationTests.java`: 컨텍스트 로딩 테스트 1개.
-- `src/test/resources/application.properties`: 테스트는 H2 메모리 DB 사용.
+---
 
-## 11) 현재 코드에서 바로 주의할 점
+## 🗄️ repository/ — 데이터 접근 계층 (Spring Data JPA)
 
-- `EnergyAggregationService`, `AiIntegrationService`, `WeatherDataFormatterUtil`는 TODO가 남아 있는 골격 단계입니다.
-- `DashboardService`는 존재하지만 현재 API 경로는 `MeasurementService` 중심으로 동작합니다.
-- `ErrorResponse`와 `ApiErrorResponse`가 공존하므로 신규 에러 응답은 `ApiErrorResponse` 기준으로 맞추는 것이 일관적입니다.
+> `JpaRepository`를 상속하여 CRUD 기본 메서드를 자동 제공받으며, 필요한 쿼리 메서드만 추가로 선언합니다.
 
+| 파일 | 주요 쿼리 메서드 |
+|------|-----------------|
+| `UserRepository` | `findByEmail(String email)` — 이메일로 사용자 단건 조회 (로그인 시 사용) |
+| `PowerPlantRepository` | `findByUserId(Long userId)` — 특정 사용자의 발전소 전체 조회<br>`findByIdAndUserId(Long id, Long userId)` — 발전소 소유권 검증 |
+| `EnergyLogRepository` | `findByPowerPlantIdAndTimestampBetween(...)` — 기간별 발전 데이터 조회<br>`findTopByPowerPlantIdOrderByTimestampDesc(...)` — 가장 최근 데이터 1건 조회 |
+| `WeatherDataRepository` | `findByPowerPlantIdAndTimestampBetween(...)` — 기간별 기상 데이터 조회 |
+| `AnomalyRepository` | `findByPowerPlantIdOrderByDetectedAtDesc(...)` — 발전소의 이상 이벤트 최신순 조회<br>`findByPowerPlantIdAndStatusOrderByDetectedAtDesc(...)` — 상태별 필터링 조회 |
+
+---
+
+## 🔐 security/ — 인증 및 보안
+
+| 파일 | 역할 |
+|------|------|
+| `JwtUtil.java` | **JWT 토큰 핵심 유틸리티**. ①`generateToken(userId)`: 사용자 ID를 subject로 담은 JWT 생성 (HS256, 기본 24시간 만료) ②`extractUserId(token)`: 토큰에서 사용자 ID 추출 ③`validateToken(token)`: 서명·만료 검증 |
+| `JwtAuthenticationFilter.java` | **모든 HTTP 요청을 가로채는 JWT 필터** (`OncePerRequestFilter`). `Authorization: Bearer <token>` 헤더에서 토큰을 추출 → `JwtUtil`로 유효성 검증 → 인증 성공 시 `SecurityContextHolder`에 사용자 정보 설정 |
+| `SecurityConfig.java` | **Spring Security 전체 설정**. ①세션 없는 Stateless 정책 적용 ②CSRF 비활성화 ③공개 경로 (`/api/v1/auth/**`, `/swagger-ui/**` 등) 설정 ④나머지 API는 인증 필요 ⑤BCrypt 패스워드 인코더 Bean 등록 ⑥`JwtAuthenticationFilter`를 Security 필터 체인에 추가 |
+
+---
+
+## 🧠 service/ — 비즈니스 로직
+
+| 파일 | 역할 |
+|------|------|
+| `AuthService.java` | **사용자 인증 서비스**. ①`signup()`: 이메일 중복 확인 → 비밀번호 BCrypt 암호화 → DB 저장 ②`login()`: 이메일 조회 → 비밀번호 검증 → 활성 상태 확인 → JWT 발급 ③`getUserInfo()`: 사용자 ID로 정보 조회 |
+| `PlantService.java` | **발전소 관리 서비스**. ①`getPlantsByUser()`: 사용자 소유 발전소 목록 조회 ②`getPlantDetail()`: 발전소 상세 조회 (소유권 검증 포함) |
+| `MeasurementService.java` | **측정 데이터 서비스**. ①`getDashboardSummary()`: 현재 발전량·금일 발전량·효율·최근 이상 정보를 집계하여 대시보드 요약 반환 ②`getMeasurementSeries()`: 지정 기간의 시계열 발전량 데이터 반환 |
+| `AnomalyService.java` | **이상 탐지 서비스**. `getRecentAnomalies()`: 특정 발전소의 최근 이상 이벤트를 최신순으로 N건 조회하여 DTO로 변환 |
+| `DashboardService.java` | **대시보드 데이터 집계 서비스**. `EnergyAggregationService`와 `AnomalyService`를 조합하여 대시보드 전체 응답 구성 |
+| `EnergyAggregationService.java` | **에너지 데이터 집계 서비스**. 시간별·일별로 발전량을 집계하여 차트 데이터 반환 *(현재 구현 예정)* |
+| `AiIntegrationService.java` | **외부 AI 서버 및 기상청 API 연동 서비스**. ①`fetchRealTimeWeather()`: 기상청 단기예보 API 호출 ②`uploadWeatherDataCsv()`: CSV 파일 파싱 → WeatherData 엔티티 변환 → DB 저장 ③`requestPredictionFromAi()`: AI 서버에 발전량 예측 요청 ④`requestXaiExplanation()`: AI 서버에 XAI 설명 요청 ⑤`processPredictionResult()`: AI 예측 결과를 EnergyLog에 저장 |
+
+---
+
+## 🚨 exception/ — 예외 처리
+
+| 파일 | 역할 |
+|------|------|
+| `BusinessException.java` | **비즈니스 로직 예외**. 잘못된 요청(중복 이메일, 비밀번호 불일치 등) 발생 시 사용. HTTP 상태 코드를 함께 담을 수 있으며, 기본값은 `400 Bad Request` |
+| `ResourceNotFoundException.java` | **리소스 없음 예외**. 존재하지 않는 발전소·사용자 조회 시 사용. `GlobalExceptionHandler`에서 `404 Not Found`로 응답 |
+| `ErrorResponse.java` | 에러 응답 형식 DTO (status, message, timestamp) |
+| `GlobalExceptionHandler.java` | **전역 예외 처리기** (`@RestControllerAdvice`). 모든 컨트롤러에서 발생하는 예외를 한 곳에서 처리. ①`BusinessException` → 400 ②`ResourceNotFoundException` → 404 ③`MethodArgumentNotValidException` (필드 검증 실패) → 400 + 상세 필드 오류 ④`AccessDeniedException` → 403 ⑤그 외 모든 예외 → 500 |
+
+---
+
+## 🛠️ util/ — 유틸리티
+
+| 파일 | 역할 |
+|------|------|
+| `CsvParsingUtil.java` | **CSV 파일 파싱 유틸리티**. OpenCSV 라이브러리를 사용해 `MultipartFile`로 업로드된 CSV 파일을 `List<String[]>` 형태로 파싱. UTF-8 인코딩 처리 |
+| `WeatherDataFormatterUtil.java` | **기상청 API 응답 파싱 유틸리티**. 기상청 단기예보 JSON 응답에서 기온(TMP), 습도(REH), 운량(SKY) 값을 추출하여 `Map<String, Double>` 형태로 변환 |
+
+---
+
+## 🔗 레이어 간 의존 관계 요약
+
+```
+HTTP 요청
+    ↓
+[Controller]         ← 요청/응답 처리, JWT 인증 확인
+    ↓
+[Service]            ← 비즈니스 로직, 외부 API 연동
+    ↓
+[Repository]         ← DB 쿼리 실행
+    ↓
+[Entity / DB]        ← 데이터 영속화 (MySQL)
+
+[Security Filter]    ← 모든 요청에서 JWT 검증 (Controller 도달 전)
+[Exception Handler]  ← 모든 레이어의 예외를 통합 처리
+[DTO]                ← Controller ↔ Service 간 데이터 전달
+[Util]               ← Service에서 호출하는 공통 처리 로직
+```
+
+---
+
+## 📡 API 엔드포인트 한눈에 보기
+
+| 메서드 | 경로 | 인증 | 설명 |
+|--------|------|:----:|------|
+| POST | `/api/v1/auth/signup` | ❌ | 회원가입 |
+| POST | `/api/v1/auth/login` | ❌ | 로그인 + JWT 발급 |
+| POST | `/api/v1/auth/logout` | ✅ | 로그아웃 |
+| GET | `/api/v1/users/me` | ✅ | 내 정보 조회 |
+| GET | `/api/v1/plants` | ✅ | 발전소 목록 조회 |
+| GET | `/api/v1/plants/{plantId}` | ✅ | 발전소 상세 조회 |
+| GET | `/api/v1/plants/{plantId}/dashboard/summary` | ✅ | 대시보드 요약 |
+| GET | `/api/v1/plants/{plantId}/measurements` | ✅ | 시계열 발전량 조회 |
+| GET | `/api/v1/plants/{plantId}/anomalies` | ✅ | 이상 탐지 목록 |
+| GET | `/api/v1/plants/{plantId}/forecasts` | ✅ | AI 발전량 예측 |
+| GET | `/api/v1/plants/{plantId}/forecasts/explanations` | ✅ | XAI 예측 근거 |
+| GET | `/api/v1/weather/current` | ❌ | 실시간 날씨 조회 |
+| POST | `/api/v1/plants/{plantId}/weather/upload-csv` | ❌ | 기상 데이터 CSV 업로드 |
+
+> ✅ = JWT Bearer 토큰 필요 / ❌ = 누구나 접근 가능  
+> Swagger UI: `http://localhost:8080/swagger-ui.html`
