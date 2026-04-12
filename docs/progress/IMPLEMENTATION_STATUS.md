@@ -1,4 +1,4 @@
-# 백엔드 API 구현 현황 (2026-04-08)
+# 백엔드 API 구현 현황 (2026-04-12)
 
 ## 현재 진행 상황
 
@@ -29,13 +29,24 @@
   - `POST /api/v1/plants/{plantId}/weather/upload-csv` - 과거 기상 데이터 CSV 업로드
   - `GET /api/v1/weather/current` - 실시간 동네 날씨 조회
 
-### 🔄 Phase 4: 이상 탐지 상세 및 예측 데이터 저장 (대기)
-- 구현 필요:
+### ✅ Phase 4: 이상 탐지 상세 및 예측 데이터 저장 (완료)
+- ✅ 예측 데이터 저장 엔티티 구현
+  - `Forecast` - 예측 데이터 저장 (powerPlant, targetTime, predictedPowerKw, confidence)
+  - `ForecastExplanation` - XAI 설명 저장
+- ✅ AI 응답 DB 저장 로직 구현 (`AiIntegrationService`에서 예측 응답 후 DB 저장)
+- 🔄 구현 필요:
   - `GET /api/v1/plants/{plantId}/anomalies/{eventId}` - 상세 조회
   - `PATCH /api/v1/plants/{plantId}/anomalies/{eventId}/status` - 상태 변경
-- 엔티티 필요:
-  - `Forecast` - 예측 데이터 저장
-  - `ForecastExplanation` - XAI 설명 저장
+
+### ✅ Phase 5: 이미지 분석 및 백그라운드 처리 (완료)
+- ✅ AI 연동 로직 비동기 처리 (@Async, CompletableFuture)
+  - 발전량 예측: `requestPredictionFromAi()`
+  - XAI 설명: `requestXaiExplanation()`
+  - 이상 탐지: `detectPowerAnomaly()`, `detectVisionAnomaly()`
+- ✅ `VisionAnalysis` 엔티티 생성 (이미지 분석 결과 및 XAI 신뢰도 저장)
+- 🔄 구현 필요:
+  - `POST /api/v1/plants/{plantId}/vision/analyze` - 패널 이미지 분석 컨트롤러
+  - `EnergyAggregationService` 시간별/일별 데이터 집계 배치 스케줄러
 
 ### 🔄 Phase 6: 챗 및 알림 (대기)
 - 구현 필요:
@@ -50,18 +61,18 @@
 ### 현재 엔티티
 - `User` - 사용자
 - `PowerPlant` - 발전소
-- `EnergyLog` - 측정 데이터 (powerKw, temperature, irradiance, humidity)
-- `Anomaly` - 이상 탐지 (severity: LOW/MEDIUM/HIGH)
+- `EnergyLog` - 실제 측정 데이터 (예측값은 forecasts 테이블과 조인)
+- `Anomaly` - 이상 탐지 (severity: LOW/MEDIUM/HIGH, cause, recommendedAction)
 - `WeatherData` - 기상 데이터
+- `Forecast` - 발전량 예측 (powerPlant, targetTime, predictedPowerKw, confidence)
+- `ForecastExplanation` - 예측 설명 (XAI 분석 결과)
+- `VisionAnalysis` - 이미지 분석 결과 및 XAI 신뢰도 저장
 
 ### 필요한 엔티티
-- `Forecast` - 발전량 예측
-- `ForecastExplanation` - 예측 설명
 - `ChatSession` - 챗 세션
 - `ChatMessage` - 챗 메시지
 - `AlertSetting` - 알림 설정
 - `AlertHistory` - 알림 이력
-- `VisionAnalysis` - 이미지 분석 결과
 
 ## 역할 분담
 
@@ -78,9 +89,9 @@
 - ✅ AI 클라이언트 설계 및 구현 (`AiIntegrationService`)
 - ✅ 예측 API 구현 (`ForecastController`)
 - ✅ 데이터 파이프라인 구현 (`WeatherController`, CSV 업로드)
-- 🔄 예측 데이터 저장 로직 구현
-- 🔄 AI 연동 로직 비동기 처리
-- 🔄 다음 AI 기능 연동 (이상 탐지)
+- ✅ 예측 데이터 저장 로직 구현
+- ✅ AI 연동 비동기 처리 (@Async, CompletableFuture 완벽 마이그레이션)
+- ✅ AI 기능 연동 (발전량 예측, XAI 설명, 이상 탐지)
 
 ## 파일 구조
 
@@ -98,26 +109,27 @@ src/main/java/com/solarwise/capstonebackend/
 ├── service/
 │   ├── AuthService.java             [회원가입, 로그인, 사용자 정보]
 │   ├── PlantService.java            [발전소 조회]
-│   ├── MeasurementService.java       [측정 데이터, 대시보드]
+│   ├── MeasurementService.java       [측정 데이터]
+│   ├── DashboardService.java        [대시보드 요약]
 │   ├── AnomalyService.java          [이상 탐지 조회]
 │   ├── EnergyAggregationService.java [에너지 집계 - 🔄]
-│   └── AiIntegrationService.java    [AI 연동 - ✅]
+│   └── AiIntegrationService.java    [AI 연동 - ✅ 비동기 처리 완료]
 │
 ├── entity/
 │   ├── User.java
 │   ├── PowerPlant.java
 │   ├── EnergyLog.java
 │   ├── Anomaly.java
-│   └── WeatherData.java
+│   ├── WeatherData.java
+│   ├── Forecast.java                [발전량 예측 - ✅]
+│   ├── ForecastExplanation.java     [예측 설명 (XAI) - ✅]
+│   └── VisionAnalysis.java          [이미지 분석 결과 - ✅]
 │
 ├── dto/
 │   ├── ApiResponse.java
 │   ├── ApiErrorResponse.java
-│   ├── ai/
-│   │   ├── AiApiResponse.java
-│   │   ├── AiPredictionRequest.java
-│   │   ├── AiPredictionResponse.java
-│   │   └── XaiExplanationResponse.java
+│   ├── DashboardResponse.java
+│   ├── DashboardSummaryDto.java
 │   ├── SignupRequest.java
 │   ├── LoginRequest.java
 │   ├── LoginResponse.java
@@ -125,15 +137,29 @@ src/main/java/com/solarwise/capstonebackend/
 │   ├── PlantResponse.java
 │   ├── MeasurementDto.java
 │   ├── MeasurementSeriesDto.java
-│   ├── DashboardSummaryDto.java
-│   └── AnomalyDto.java
+│   ├── AnomalyDto.java
+│   ├── EnergyLogDto.java
+│   └── ai/
+│       ├── AiApiResponse.java
+│       ├── AiPredictionRequest.java
+│       ├── AiPredictionResponse.java
+│       ├── ForecastDto.java
+│       ├── HistoryDataDto.java
+│       ├── WeatherForecastDto.java
+│       ├── XaiExplanationDto.java
+│       ├── XaiExplanationRequest.java
+│       ├── XaiExplanationResponse.java
+│       ├── PowerAnomalyDetectionRequest.java
+│       ├── PowerAnomalyDetectionResponse.java
+│       └── VisionAnomalyDetectionResponse.java
 │
 ├── repository/
 │   ├── UserRepository.java
 │   ├── PowerPlantRepository.java
 │   ├── EnergyLogRepository.java
 │   ├── AnomalyRepository.java
-│   └── WeatherDataRepository.java
+│   ├── WeatherDataRepository.java
+│   └── ForecastRepository.java       [발전량 예측 저장소 - ✅]
 │
 ├── security/
 │   ├── JwtAuthenticationFilter.java
@@ -143,13 +169,19 @@ src/main/java/com/solarwise/capstonebackend/
 ├── exception/
 │   ├── BusinessException.java
 │   ├── ResourceNotFoundException.java
-│   └── GlobalExceptionHandler.java
+│   ├── GlobalExceptionHandler.java
+│   └── ErrorResponse.java
 │
 ├── config/
 │   ├── SwaggerConfig.java
-│   └── WebConfig.java
+│   ├── WebConfig.java
+│   └── DataInitConfig.java
 │
-└── CapstoneBackendApplication.java
+├── util/
+│   ├── CsvParsingUtil.java
+│   └── WeatherDataFormatterUtil.java
+│
+└── CapstoneBackendApplication.java  [@EnableAsync 적용]
 ```
 
 ## 테스트 현황
@@ -217,22 +249,22 @@ src/main/java/com/solarwise/capstonebackend/
 ## 다음 작업 우선순위
 
 ### P0 (이번 주)
-1. 이상 탐지 상세 조회 API
-2. 이상 탐지 상태 변경 API
+1. 이상 탐지 상세 조회 API (`GET /api/v1/plants/{plantId}/anomalies/{eventId}`)
+2. 이상 탐지 상태 변경 API (`PATCH /api/v1/plants/{plantId}/anomalies/{eventId}/status`)
 3. 기본 테스트 추가
 
 ### P1 (다음주)
-1. 예측 발전량 API
-2. 예측 설명 (XAI) API
-3. AI 클라이언트 초안 작성
+1. 실시간 발전량 vs 예측값 비교 로직 (이상 감지 엔진)
+2. 기상청 API 연동 주기적 수집 스케줄러
+3. `POST /api/v1/plants/{plantId}/vision/analyze` - 패널 이미지 분석 컨트롤러 구현
 
 ### P2 (2주차)
-1. 이미지 분석 API
+1. `EnergyAggregationService` 시간별/일별 데이터 집계 배치 스케줄러
 2. 챗 세션/메시지 API
-3. 비동기 처리 구조
+3. 알림 설정 API
 
 ### P3 (3주차)
-1. 알림 설정 API
+1. 알림 이력 관리
 2. 메일 발송 통합
 3. 권한 세분화
 
@@ -261,4 +293,4 @@ src/main/java/com/solarwise/capstonebackend/
 - 백엔드 작업 계획: `docs/planning/backend-work-plan.md`
 - Phase 1 상세: `docs/progress/IMPLEMENTATION_PHASE_1.md`
 - Phase 2 상세: `docs/progress/IMPLEMENTATION_PHASE_2.md`
-- Phase 3 상세: `docs/progress/IMPLEMENTATION_Phase_3.md` 
+- Phase 3 상세: `docs/progress/IMPLEMENTATION_Phase_3.md`
