@@ -22,13 +22,13 @@ public class ForecastController {
     @Operation(summary = "발전량 예측 조회")
     @GetMapping
     public ApiResponse<AiPredictionResponse> getForecast(@PathVariable Long plantId) {
-        AiPredictionResponse prediction = aiIntegrationService.requestPredictionFromAi(plantId);
+        AiPredictionResponse prediction = aiIntegrationService.requestPredictionFromAi(plantId).join();
         return ApiResponse.success(prediction, "AI 예측 발전량 조회 성공");
     }
     @Operation(summary = "예측 근거(XAI) 조회")
     @GetMapping("/explanations")
     public ApiResponse<XaiExplanationResponse> getForecastExplanation(@PathVariable Long plantId) {
-        XaiExplanationResponse explanation = aiIntegrationService.requestXaiExplanation(plantId);
+        XaiExplanationResponse explanation = aiIntegrationService.requestXaiExplanation(plantId).join();
         return ApiResponse.success(explanation,"XAI 예측 설명 조회 성공");
     }
 }

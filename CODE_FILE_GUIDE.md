@@ -27,10 +27,9 @@ com.solarwise.capstonebackend/
 
 ## 🚀 진입점
 
-### `CapstoneBackendApplication.java`
-- Spring Boot 애플리케이션의 **시작점**
-- `@SpringBootApplication`으로 자동 설정, 컴포넌트 스캔, JPA 활성화
-- `main()` 메서드를 통해 내장 Tomcat 서버 실행
+| 파일 | 역할 |
+|------|------|
+| `CapstoneBackendApplication.java` | Spring Boot 애플리케이션의 **시작점**. `@SpringBootApplication`으로 자동 설정, 컴포넌트 스캔, JPA 활성화. `@EnableAsync`로 비동기 처리 활성화. `main()` 메서드를 통해 내장 Tomcat 서버 실행 |
 
 ---
 
@@ -92,8 +91,10 @@ com.solarwise.capstonebackend/
 ### AI 서버 전용 (`dto/ai/`)
 | 파일 | 역할 |
 |------|------|
-| `AiPredictionRequest` | AI 서버로 보내는 **발전량 예측 요청** DTO (plant_id, 날짜, 일사량, 기온, 모듈 온도, 풍속, 습도) |
-| `AiPredictionResponse` | AI 서버로부터 받는 **예측 결과** DTO (predicted_ac_power, confidence, drift_detected) |
+| `AiPredictionRequest` | AI 서버로 보내는 **발전량 예측 요청** DTO (plantId, requestedAt, history, weatherForecast) |
+| `AiPredictionResponse` | AI 서버로부터 받는 **예측 결과** DTO (forecastSeries, explanations 리스트) |
+| `ForecastDto` | 개별 예측 포인트 DTO (targetTime, predictedPowerKw, confidence) |
+| `XaiExplanationRequest` | XAI 설명 요청 DTO (plantId, eventId, context) |
 | `XaiExplanationResponse` | AI 서버로부터 받는 **XAI 설명 결과** DTO (예측 근거·피처 중요도 등) |
 | `AiApiResponse<T>` | AI 서버 응답 공통 래퍼 (status, data) |
 
@@ -105,9 +106,12 @@ com.solarwise.capstonebackend/
 |------|-----------|------|
 | `User.java` | `users` | **사용자(발전소 관리자)** 정보. email(고유), password(암호화), name, role(ADMIN/MANAGER/USER), active 상태 관리. `@PrePersist`/`@PreUpdate`로 생성·수정 시각 자동 기록 |
 | `PowerPlant.java` | `power_plants` | **태양광 발전소** 정보. name, location, capacity(kW), panelCount, inverterModel, sensorSerialNumber, status(ACTIVE/INACTIVE). User와 N:1 관계 |
-| `EnergyLog.java` | `energy_logs` | **실시간 발전량 시계열 데이터**. powerKw(실제 발전), temperature, irradiance, humidity, predictedGeneration(AI 예측값). PowerPlant와 N:1 관계. timestamp 인덱스로 빠른 범위 조회 지원 |
+| `EnergyLog.java` | `energy_logs` | **실시간 발전량 시계열 데이터**. powerKw(실제 발전), temperature, irradiance, humidity. PowerPlant와 N:1 관계. timestamp 인덱스로 빠른 범위 조회 지원 (예측값은 forecasts 테이블과 조인) |
 | `WeatherData.java` | `weather_data` | **기상 데이터**. temperature, humidity, irradiance, cloudCover. PowerPlant와 N:1 관계. 기상청 API 또는 CSV 업로드로 적재됨 |
 | `Anomaly.java` | `anomalies` | **이상 탐지 이벤트**. type(POWER/VISION), severity(LOW/MEDIUM/HIGH), summary, cause, recommendedAction, xaiExplanation(SHAP/LIME 기반 AI 설명), status(DETECTED/ACKNOWLEDGED/RESOLVED). PowerPlant와 N:1 관계 |
+| `Forecast.java` | `forecasts` | **AI 발전량 예측 결과**. powerPlant(@ManyToOne), targetTime(LocalDateTime), predictedPowerKw(Double), confidence(Double). PowerPlant와 N:1 관계 |
+| `ForecastExplanation.java` | `forecast_explanations` | **AI 예측 근거 설명**. forecast(@OneToOne), explanation(String). Forecast와 1:1 관계 |
+| `VisionAnalysis.java` | `vision_analyses` | **이미지 분석 결과**. anomaly(@OneToOne), imageUrl(String), analysisResult(String). Anomaly와 1:1 관계 |
 
 ---
 
@@ -122,6 +126,7 @@ com.solarwise.capstonebackend/
 | `EnergyLogRepository` | `findByPowerPlantIdAndTimestampBetween(...)` — 기간별 발전 데이터 조회<br>`findTopByPowerPlantIdOrderByTimestampDesc(...)` — 가장 최근 데이터 1건 조회 |
 | `WeatherDataRepository` | `findByPowerPlantIdAndTimestampBetween(...)` — 기간별 기상 데이터 조회 |
 | `AnomalyRepository` | `findByPowerPlantIdOrderByDetectedAtDesc(...)` — 발전소의 이상 이벤트 최신순 조회<br>`findByPowerPlantIdAndStatusOrderByDetectedAtDesc(...)` — 상태별 필터링 조회 |
+| `ForecastRepository` | `findByPowerPlantIdAndTargetTimeBetween(...)` — 발전소별 기간별 예측 데이터 조회 |
 
 ---
 
@@ -145,7 +150,7 @@ com.solarwise.capstonebackend/
 | `AnomalyService.java` | **이상 탐지 서비스**. `getRecentAnomalies()`: 특정 발전소의 최근 이상 이벤트를 최신순으로 N건 조회하여 DTO로 변환 |
 | `DashboardService.java` | **대시보드 데이터 집계 서비스**. `EnergyAggregationService`와 `AnomalyService`를 조합하여 대시보드 전체 응답 구성 |
 | `EnergyAggregationService.java` | **에너지 데이터 집계 서비스**. 시간별·일별로 발전량을 집계하여 차트 데이터 반환 *(현재 구현 예정)* |
-| `AiIntegrationService.java` | **외부 AI 서버 및 기상청 API 연동 서비스**. ①`fetchRealTimeWeather()`: 기상청 단기예보 API 호출 ②`uploadWeatherDataCsv()`: CSV 파일 파싱 → WeatherData 엔티티 변환 → DB 저장 ③`requestPredictionFromAi()`: AI 서버에 발전량 예측 요청 ④`requestXaiExplanation()`: AI 서버에 XAI 설명 요청 ⑤`processPredictionResult()`: AI 예측 결과를 EnergyLog에 저장 |
+| `AiIntegrationService.java` | **외부 AI 서버 및 기상청 API 연동 서비스**. `@Async`와 `CompletableFuture`를 사용하여 비동기적으로 외부 API 호출. ①`fetchRealTimeWeather()`: 기상청 단기예보 API 호출 ②`uploadWeatherDataCsv()`: CSV 파일 파싱 → WeatherData 엔티티 변환 → DB 저장 ③`requestPredictionFromAi()`: AI 서버에 발전량 예측 요청 및 Forecast 엔티티 저장 ④`requestXaiExplanation()`: AI 서버에 XAI 설명 요청 ⑤`detectPowerAnomaly()`: 전력 이상 감지 요청 ⑥`detectVisionAnomaly()`: 이미지 분석 요청 |
 
 ---
 

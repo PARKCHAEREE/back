@@ -40,9 +40,6 @@ public class EnergyLog {
     @Column(nullable = false)
     private Double humidity; // 습도 (%)
 
-    @Column
-    private Double predictedGeneration; // AI 예측 발전량 (kWh)
-
     @Column(nullable = false)
     private LocalDateTime timestamp;
 
