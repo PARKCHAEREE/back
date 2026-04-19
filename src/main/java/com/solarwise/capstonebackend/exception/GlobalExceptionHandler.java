@@ -31,7 +31,7 @@ public class GlobalExceptionHandler {
         log.warn("비즈니스 예외 발생: {}", ex.getMessage());
         return new ResponseEntity<>(
                 ApiErrorResponse.error("BUSINESS_ERROR", ex.getMessage()),
-                HttpStatus.BAD_REQUEST
+                ex.getStatus()
         );
     }
 

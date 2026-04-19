@@ -4,6 +4,7 @@ import com.solarwise.capstonebackend.dto.*;
 import com.solarwise.capstonebackend.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -30,7 +31,7 @@ public class AuthController {
      */
     @PostMapping("/signup")
     @Operation(summary = "회원가입", description = "새로운 사용자 가입")
-    public ResponseEntity<ApiResponse<UserResponse>> signup(@RequestBody SignupRequest request) {
+    public ResponseEntity<ApiResponse<UserResponse>> signup(@Valid @RequestBody SignupRequest request) {
         log.info("회원가입 요청: email={}", request.getEmail());
         UserResponse response = authService.signup(request);
         return ResponseEntity.status(HttpStatus.CREATED)
@@ -42,7 +43,7 @@ public class AuthController {
      */
     @PostMapping("/login")
     @Operation(summary = "로그인", description = "이메일과 비밀번호로 로그인하여 JWT 토큰 획득")
-    public ResponseEntity<ApiResponse<LoginResponse>> login(@RequestBody LoginRequest request) {
+    public ResponseEntity<ApiResponse<LoginResponse>> login(@Valid @RequestBody LoginRequest request) {
         log.info("로그인 요청: email={}", request.getEmail());
         LoginResponse response = authService.login(request);
         return ResponseEntity.ok(ApiResponse.success(response, "로그인에 성공했습니다."));

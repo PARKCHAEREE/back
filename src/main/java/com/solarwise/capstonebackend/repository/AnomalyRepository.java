@@ -6,6 +6,7 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * 이상 탐지 저장소
@@ -14,6 +15,8 @@ import java.util.List;
 public interface AnomalyRepository extends JpaRepository<Anomaly, Long> {
 
     List<Anomaly> findByPowerPlantIdOrderByDetectedAtDesc(Long powerPlantId);
+
+    Optional<Anomaly> findByIdAndPowerPlantId(Long id, Long powerPlantId);
 
     List<Anomaly> findByPowerPlantIdAndStatusOrderByDetectedAtDesc(Long powerPlantId, String status);
 

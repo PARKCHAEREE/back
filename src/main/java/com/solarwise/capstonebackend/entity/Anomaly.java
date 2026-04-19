@@ -48,8 +48,8 @@ public class Anomaly {
     @Column(columnDefinition = "LONGTEXT")
     private String xaiExplanation; // SHAP/LIME 기반 설명 가능한 AI
 
-    @Column(length = 50, columnDefinition = "VARCHAR(50) DEFAULT 'DETECTED'")
-    private String status; // DETECTED, ACKNOWLEDGED, RESOLVED
+    @Column(length = 50, columnDefinition = "VARCHAR(50) DEFAULT 'OPEN'")
+    private String status; // OPEN, ACKNOWLEDGED, RESOLVED
 
     @Column(nullable = false)
     private LocalDateTime detectedAt;
@@ -68,7 +68,7 @@ public class Anomaly {
         createdAt = LocalDateTime.now();
         updatedAt = LocalDateTime.now();
         if (status == null) {
-            status = "DETECTED";
+            status = "OPEN";
         }
     }
 

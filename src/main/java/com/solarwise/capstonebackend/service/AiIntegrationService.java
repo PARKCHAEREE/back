@@ -590,7 +590,7 @@ public class AiIntegrationService {
                 .severity(response.getSeverity())
                 .cause(String.format("예측값 대비 %.2f%% 편차", calculateDeviation(response)))
                 .recommendedAction(response.getRecommendation())
-                .status("DETECTED")
+                .status("OPEN")
                 .detectedAt(LocalDateTime.now())
                 .build();
 
@@ -615,7 +615,7 @@ public class AiIntegrationService {
                 .severity(response.getSeverity())
                 .cause(String.format("결함 유형: %s (신뢰도: %.2f%%)", response.getDefectType(), response.getConfidence() * 100))
                 .recommendedAction(response.getRecommendation())
-                .status("DETECTED")
+                .status("OPEN")
                 .detectedAt(LocalDateTime.now())
                 .build();
 

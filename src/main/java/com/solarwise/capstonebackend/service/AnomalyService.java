@@ -1,12 +1,20 @@
 package com.solarwise.capstonebackend.service;
 
 import com.solarwise.capstonebackend.dto.AnomalyDto;
+import com.solarwise.capstonebackend.dto.UpdateAnomalyStatusResponse;
 import com.solarwise.capstonebackend.entity.Anomaly;
+import com.solarwise.capstonebackend.entity.PowerPlant;
+import com.solarwise.capstonebackend.exception.BusinessException;
+import com.solarwise.capstonebackend.exception.ResourceNotFoundException;
 import com.solarwise.capstonebackend.repository.AnomalyRepository;
+import com.solarwise.capstonebackend.repository.PowerPlantRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -21,9 +29,23 @@ import java.util.stream.Collectors;
 public class AnomalyService {
 
     private final AnomalyRepository anomalyRepository;
+    private final PowerPlantRepository powerPlantRepository;
 
     /**
      * 최근 이상 탐지 조회
+     */
+    public List<AnomalyDto> getRecentAnomalies(Long powerPlantId, Long userId, int limit) {
+        validatePlantAccess(powerPlantId, userId);
+
+        return anomalyRepository.findByPowerPlantIdOrderByDetectedAtDesc(powerPlantId)
+                .stream()
+                .limit(limit)
+                .map(this::entityToDto)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 최근 이상 탐지 조회 (내부 서비스용)
      */
     public List<AnomalyDto> getRecentAnomalies(Long powerPlantId, int limit) {
         return anomalyRepository.findByPowerPlantIdOrderByDetectedAtDesc(powerPlantId)
@@ -31,6 +53,45 @@ public class AnomalyService {
                 .limit(limit)
                 .map(this::entityToDto)
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * 이상 이벤트 상세 조회
+     */
+    public AnomalyDto getAnomalyDetail(Long powerPlantId, Long eventId, Long userId) {
+        validatePlantAccess(powerPlantId, userId);
+
+        Anomaly anomaly = anomalyRepository.findByIdAndPowerPlantId(eventId, powerPlantId)
+                .orElseThrow(() -> new ResourceNotFoundException("이상 이벤트를 찾을 수 없습니다."));
+
+        return entityToDto(anomaly);
+    }
+
+    /**
+     * 이상 이벤트 상태 변경
+     */
+    @Transactional
+    public UpdateAnomalyStatusResponse updateAnomalyStatus(Long powerPlantId, Long eventId, Long userId, String status) {
+        validatePlantAccess(powerPlantId, userId);
+
+        Anomaly anomaly = anomalyRepository.findByIdAndPowerPlantId(eventId, powerPlantId)
+                .orElseThrow(() -> new ResourceNotFoundException("이상 이벤트를 찾을 수 없습니다."));
+
+        String normalizedStatus = normalizeStatus(status);
+        validateSupportedStatus(normalizedStatus);
+
+        anomaly.setStatus(normalizedStatus);
+        if ("RESOLVED".equals(normalizedStatus)) {
+            anomaly.setResolvedAt(LocalDateTime.now());
+        } else {
+            anomaly.setResolvedAt(null);
+        }
+
+        Anomaly updatedAnomaly = anomalyRepository.save(anomaly);
+        return UpdateAnomalyStatusResponse.builder()
+                .eventId(updatedAnomaly.getId())
+                .status(normalizeStatus(updatedAnomaly.getStatus()))
+                .build();
     }
 
     /**
@@ -43,11 +104,29 @@ public class AnomalyService {
                 .severity(anomaly.getSeverity())
                 .detectedAt(anomaly.getDetectedAt())
                 .summary(anomaly.getSummary())
-                .status(anomaly.getStatus())
+                .status(normalizeStatus(anomaly.getStatus()))
                 .cause(anomaly.getCause())
                 .recommendedAction(anomaly.getRecommendedAction())
                 .xaiExplanation(anomaly.getXaiExplanation())
                 .build();
+    }
+
+    private PowerPlant validatePlantAccess(Long powerPlantId, Long userId) {
+        return powerPlantRepository.findByIdAndUserId(powerPlantId, userId)
+                .orElseThrow(() -> new ResourceNotFoundException("발전소를 찾을 수 없습니다."));
+    }
+
+    private void validateSupportedStatus(String status) {
+        if (!"OPEN".equals(status) && !"ACKNOWLEDGED".equals(status) && !"RESOLVED".equals(status)) {
+            throw new BusinessException("지원하지 않는 이상 이벤트 상태입니다.", HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    private String normalizeStatus(String status) {
+        if (status == null || status.isBlank() || "DETECTED".equals(status)) {
+            return "OPEN";
+        }
+        return status;
     }
 
 }

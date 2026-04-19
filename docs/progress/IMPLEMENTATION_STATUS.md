@@ -34,9 +34,11 @@
   - `Forecast` - 예측 데이터 저장 (powerPlant, targetTime, predictedPowerKw, confidence)
   - `ForecastExplanation` - XAI 설명 저장
 - ✅ AI 응답 DB 저장 로직 구현 (`AiIntegrationService`에서 예측 응답 후 DB 저장)
-- 🔄 구현 필요:
-  - `GET /api/v1/plants/{plantId}/anomalies/{eventId}` - 상세 조회
-  - `PATCH /api/v1/plants/{plantId}/anomalies/{eventId}/status` - 상태 변경
+- ✅ 이상 탐지 상세 조회 API (`GET /api/v1/plants/{plantId}/anomalies/{eventId}`)
+- ✅ 이상 탐지 상태 변경 API (`PATCH /api/v1/plants/{plantId}/anomalies/{eventId}/status`)
+  - 상태 규칙: `OPEN`, `ACKNOWLEDGED`, `RESOLVED` (레거시 `DETECTED` 자동 정규화)
+  - `RESOLVED` 시 `resolvedAt` 자동 설정, 되돌릴 경우 초기화
+  - 발전소 소유권 검증 포함
 
 ### ✅ Phase 5: 이미지 분석 및 백그라운드 처리 (완료)
 - ✅ AI 연동 로직 비동기 처리 (@Async, CompletableFuture)
@@ -82,8 +84,11 @@
 - ✅ 발전소 조회 API (목록, 상세)
 - ✅ 측정 데이터 조회 API
 - ✅ 대시보드 요약 API
-- 🔄 이상 탐지 상세 API
-- 🔄 데이터 모델 정리 및 엔티티 추가
+- ✅ 이상 탐지 상세 조회 API
+- ✅ 이상 탐지 상태 변경 API (소유권 검증, 상태 정규화 포함)
+- ✅ 이상 탐지 서비스 단위 테스트 (8개 케이스)
+- ✅ 요청 검증 (DTO Validation) 추가
+- 🔄 데이터 모델 정리 및 엔티티 추가 (ChatSession, AlertSetting 등)
 
 ### AI/데이터 연동 영역(박채리)
 - ✅ AI 클라이언트 설계 및 구현 (`AiIntegrationService`)
@@ -187,14 +192,20 @@ src/main/java/com/solarwise/capstonebackend/
 ## 테스트 현황
 
 ### 현재 테스트
-- ✅ contextLoads() - Spring Boot 애플리케이션 시작 확인
+- ✅ `contextLoads()` - Spring Boot 애플리케이션 시작 확인
+- ✅ `AnomalyServiceTest` (7개 케이스)
+  - DETECTED → OPEN 상태 정규화 검증
+  - 발전소 소유권 검증 (타인 접근 시 404)
+  - 없는 이벤트 접근 시 404
+  - RESOLVED 변경 시 resolvedAt 자동 설정
+  - ACKNOWLEDGED 변경 시 resolvedAt 초기화
+  - OPEN으로 되돌리기
+  - 목록 조회 시 상태 정규화
 
 ### 필요한 테스트
-- 인증 서비스 테스트
+- 인증 서비스 테스트 (signup/login 검증)
 - 발전소 조회 테스트
 - 측정 데이터 조회 테스트
-- 예외 처리 테스트
-- 권한 검증 테스트
 
 ## 빌드 정보
 
@@ -248,24 +259,24 @@ src/main/java/com/solarwise/capstonebackend/
 
 ## 다음 작업 우선순위
 
-### P0 (이번 주)
-1. 이상 탐지 상세 조회 API (`GET /api/v1/plants/{plantId}/anomalies/{eventId}`)
-2. 이상 탐지 상태 변경 API (`PATCH /api/v1/plants/{plantId}/anomalies/{eventId}/status`)
-3. 기본 테스트 추가
+### P0 (이번 주) ✅ 완료
+1. ~~이상 탐지 상세 조회 API~~ (`GET /api/v1/plants/{plantId}/anomalies/{eventId}`)
+2. ~~이상 탐지 상태 변경 API~~ (`PATCH /api/v1/plants/{plantId}/anomalies/{eventId}/status`)
+3. ~~기본 테스트 추가~~ (AnomalyService 단위 테스트 7케이스)
 
 ### P1 (다음주)
-1. 실시간 발전량 vs 예측값 비교 로직 (이상 감지 엔진)
-2. 기상청 API 연동 주기적 수집 스케줄러
-3. `POST /api/v1/plants/{plantId}/vision/analyze` - 패널 이미지 분석 컨트롤러 구현
+1. 요청 검증 강화 (`SignupRequest`, `LoginRequest` @Valid 추가)
+2. `POST /api/v1/plants/{plantId}/vision/analyze` - 패널 이미지 분석 컨트롤러 구현
+3. 인증 서비스 단위 테스트 추가
 
 ### P2 (2주차)
 1. `EnergyAggregationService` 시간별/일별 데이터 집계 배치 스케줄러
-2. 챗 세션/메시지 API
-3. 알림 설정 API
+2. 챗 세션/메시지 API + `ChatSession`, `ChatMessage` 엔티티
+3. 알림 설정 API + `AlertSetting`, `AlertHistory` 엔티티
 
 ### P3 (3주차)
-1. 알림 이력 관리
-2. 메일 발송 통합
+1. 알림 이력 관리 및 메일 발송 통합
+2. 기상청 API 연동 주기적 수집 스케줄러
 3. 권한 세분화
 
 ## 주의사항
