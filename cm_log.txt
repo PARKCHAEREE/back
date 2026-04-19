@@ -1,9 +1,0 @@
-docs: 2026-04-19 daily log 작성
-
-[이승윤] 이상탐지 API 완성 및 테스트 작업 기록
-- 이상탐지 상세 조회/상태 변경 API 구현 내용 문서화
-- 상태값 정합성 정리 (DETECTED to OPEN) 기록
-- Validation 추가 내역 기록
-- AnomalyServiceTest 7케이스 기록
-- 테스트 8/8 통과 확인
-
