@@ -69,7 +69,7 @@ public class AiIntegrationService {
     private final WeatherDataRepository weatherDataRepository;
     private final VisionAnalysisRepository visionAnalysisRepository;
 
-    @Value("${kma.api.key}")
+    @Value("${kma.api.key:}")
     private String apiKey;
 
     @Value("${ai.server.base-url}")
@@ -84,6 +84,10 @@ public class AiIntegrationService {
      * @throws RuntimeException 기상청 API 통신 중 오류 발생 시
      */
     public Map<String, Double> fetchRealTimeWeather(int nx, int ny) {
+        if (apiKey == null || apiKey.isBlank()) {
+            throw new IllegalStateException("kma.api.key 설정이 필요합니다.");
+        }
+
         String baseDate = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
         String baseTime = "0500"; // 단기예보 기준 시간
 
