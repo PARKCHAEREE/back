@@ -1,4 +1,4 @@
-# 백엔드 API 구현 현황 (2026-04-12)
+# 백엔드 API 구현 현황 (2026-04-29)
 
 ## 현재 진행 상황
 
@@ -47,7 +47,7 @@
   - 이상 탐지: `detectPowerAnomaly()`, `detectVisionAnomaly()`
 - ✅ `VisionAnalysis` 엔티티 생성 (이미지 분석 결과 및 XAI 신뢰도 저장)
 - 🔄 구현 필요:
-  - `POST /api/v1/plants/{plantId}/vision/analyze` - 패널 이미지 분석 컨트롤러
+  - `POST /api/v1/plants/{plantId}/vision/random-analyze` - 시연용 랜덤 패널 이미지 분석 API 구현
   - `EnergyAggregationService` 시간별/일별 데이터 집계 배치 스케줄러
 
 ### 🔄 Phase 6: 챗 및 알림 (대기)

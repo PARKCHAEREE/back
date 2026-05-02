@@ -11,11 +11,11 @@ import com.solarwise.capstonebackend.dto.ai.WeatherForecastDto;
 import com.solarwise.capstonebackend.dto.ai.XaiExplanationRequest;
 import com.solarwise.capstonebackend.dto.ai.XaiExplanationResponse;
 import com.solarwise.capstonebackend.entity.Anomaly;
-import com.solarwise.capstonebackend.entity.EnergyLog;
 import com.solarwise.capstonebackend.entity.Forecast;
 import com.solarwise.capstonebackend.entity.PowerPlant;
 import com.solarwise.capstonebackend.entity.WeatherData;
 import com.solarwise.capstonebackend.entity.VisionAnalysis;
+import com.solarwise.capstonebackend.exception.BusinessException;
 import com.solarwise.capstonebackend.repository.AnomalyRepository;
 import com.solarwise.capstonebackend.repository.EnergyLogRepository;
 import com.solarwise.capstonebackend.repository.ForecastRepository;
@@ -30,6 +30,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
@@ -60,7 +61,6 @@ public class AiIntegrationService {
 
     private final RestTemplate restTemplate;
     private final PowerPlantRepository powerPlantRepository;
-    private final EnergyLogRepository energyLogRepository;
     private final ForecastRepository forecastRepository;
     private final AnomalyRepository anomalyRepository;
     private final WeatherDataFormatterUtil weatherDataFormatterUtil;
@@ -76,17 +76,22 @@ public class AiIntegrationService {
     private String aiServerBaseUrl;
 
     /**
-     * 기상청 단기예보 API를 호출하여 특정 위치의 실시간 날씨 데이터를 조회합니다.
+     * 기상청 단기예보 API를 호출하여 특정 발전소 위치의 실시간 날씨 데이터를 조회하고 DB에 저장합니다.
      *
-     * @param nx 예보지점 X 좌표
-     * @param ny 예보지점 Y 좌표
-     * @return 날씨 데이터 (기온, 습도, 풍속 등)를 담은 Map
-     * @throws RuntimeException 기상청 API 통신 중 오류 발생 시
+     * @param plantId 날씨 데이터를 조회할 발전소의 ID
+     * @return 조회된 기상 데이터를 담은 WeatherData 엔티티
+     * @throws BusinessException API 호출 실패 또는 데이터 파싱 오류 시
      */
-    public Map<String, Double> fetchRealTimeWeather(int nx, int ny) {
+    public WeatherData fetchRealTimeWeather(Long plantId) {
         if (apiKey == null || apiKey.isBlank()) {
-            throw new IllegalStateException("kma.api.key 설정이 필요합니다.");
+            throw new BusinessException("kma.api.key 설정이 필요합니다.", HttpStatus.INTERNAL_SERVER_ERROR);
         }
+
+        PowerPlant powerPlant = powerPlantRepository.findById(plantId)
+                .orElseThrow(() -> new BusinessException("발전소를 찾을 수 없습니다. ID: " + plantId, HttpStatus.NOT_FOUND));
+
+        int nx = powerPlant.getNx();
+        int ny = powerPlant.getNy();
 
         String baseDate = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
         String baseTime = "0500"; // 단기예보 기준 시간
@@ -96,14 +101,24 @@ public class AiIntegrationService {
                 apiKey, baseDate, baseTime, nx, ny
         );
 
-        log.info("기상청 API 호출: (X:{}, Y:{})", nx, ny);
+        log.info("기상청 API 호출: 발전소 ID={}, (X:{}, Y:{})", plantId, nx, ny);
 
         try {
             String jsonResponse = restTemplate.getForObject(url, String.class);
-            return weatherDataFormatterUtil.formatWeatherData(jsonResponse);
+            log.info(" 기상청 실제 응답 원본: {}", jsonResponse);
+            WeatherData weatherData = weatherDataFormatterUtil.parseKmaResponse(jsonResponse, powerPlant);
+
+            // DB에 저장
+            weatherDataRepository.save(weatherData);
+            log.info("기상 데이터 DB 저장 완료: 발전소 ID={}, 온도={}℃", plantId, weatherData.getTemperature());
+
+            return weatherData;
+
+        } catch (BusinessException e) {
+            throw e;
         } catch (Exception e) {
-            log.error("기상청 API 호출 실패: {}", e.getMessage());
-            throw new RuntimeException("기상청 통신 오류", e);
+            log.error("기상청 API 호출 실패: 발전소 ID={}, 오류={}", plantId, e.getMessage());
+            throw new BusinessException("기상청 API 통신 중 오류가 발생했습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -224,7 +239,6 @@ public class AiIntegrationService {
      * @param powerPlant 발전소 엔티티
      * @param response AI 서버의 예측 응답
      */
-    @Transactional
     private void saveForecastsToDB(PowerPlant powerPlant, AiPredictionResponse response) {
         if (response.getForecastSeries() == null || response.getForecastSeries().isEmpty()) {
             log.warn("예측 시계열 데이터가 없습니다.");
@@ -272,15 +286,12 @@ public class AiIntegrationService {
         Double actual = 95.0;   // TODO: EnergyLogRepository에서 최근 실제값 조회
 
         // 기상 데이터 조회
-        int nx = 60; // TODO: PowerPlant에서 좌표 조회
-        int ny = 127;
-        Map<String, Double> weatherData = fetchRealTimeWeather(nx, ny);
-
+        WeatherData weatherDataEntity = fetchRealTimeWeather(powerPlantId);
         LocalDateTime now = LocalDateTime.now();
-        Double ambientTemperature = weatherData.getOrDefault("T1H", 0.0);
-        Double irradiation = weatherData.getOrDefault("IRR", 0.0);
-        Double windSpeed = weatherData.getOrDefault("WSD", 0.0);
-        Double humidity = weatherData.getOrDefault("REH", 0.0);
+        Double ambientTemperature = weatherDataEntity.getTemperature();
+        Double irradiation = weatherDataEntity.getIrradiance();
+        Double windSpeed = 0.0; // WeatherData에 windSpeed 없음, 기본값
+        Double humidity = weatherDataEntity.getHumidity();
         Double moduleTemperature = ambientTemperature + (irradiation * 20);
 
         // 명세서 6-4에 맞는 XAI 요청 DTO 생성
@@ -350,15 +361,12 @@ public class AiIntegrationService {
                 .orElseThrow(() -> new IllegalArgumentException("발전소를 찾을 수 없습니다. ID: " + powerPlantId));
 
         // TODO: 발전소 Entity에 기상청 API 호출을 위한 nx, ny 좌표가 저장되어 있어야 합니다. 여기서는 임시값을 사용합니다.
-        int nx = 60; // 예시: 서울특별시
-        int ny = 127;
-        Map<String, Double> weatherData = fetchRealTimeWeather(nx, ny);
-
+        WeatherData weatherDataEntity = fetchRealTimeWeather(powerPlantId);
         LocalDateTime now = LocalDateTime.now();
-        Double ambientTemperature = weatherData.getOrDefault("T1H", 0.0);
-        Double irradiation = weatherData.getOrDefault("IRR", 0.0);
-        Double windSpeed = weatherData.getOrDefault("WSD", 0.0);
-        Double humidity = weatherData.getOrDefault("REH", 0.0);
+        Double ambientTemperature = weatherDataEntity.getTemperature();
+        Double irradiation = weatherDataEntity.getIrradiance();
+        Double windSpeed = 0.0; // WeatherData에 windSpeed 없음, 기본값
+        Double humidity = weatherDataEntity.getHumidity();
         Double moduleTemperature = ambientTemperature + (irradiation * 20); // 간단한 추정식
 
         // 과거 데이터 (히스토리) 조회
@@ -455,13 +463,10 @@ public class AiIntegrationService {
                 .orElseThrow(() -> new IllegalArgumentException("발전소를 찾을 수 없습니다. ID: " + powerPlantId));
 
         // 기상 데이터 조회
-        int nx = 60; // TODO: PowerPlant에서 좌표 조회
-        int ny = 127;
-        Map<String, Double> weatherData = fetchRealTimeWeather(nx, ny);
-
+        WeatherData weatherDataEntity = fetchRealTimeWeather(powerPlantId);
         LocalDateTime now = LocalDateTime.now();
-        Double ambientTemperature = weatherData.getOrDefault("T1H", 0.0);
-        Double irradiation = weatherData.getOrDefault("IRR", 0.0);
+        Double ambientTemperature = weatherDataEntity.getTemperature();
+        Double irradiation = weatherDataEntity.getIrradiance();
         Double moduleTemperature = ambientTemperature + (irradiation * 20);
 
         PowerAnomalyDetectionRequest requestDto = PowerAnomalyDetectionRequest.builder()
@@ -584,7 +589,6 @@ public class AiIntegrationService {
      * @param powerPlant 발전소 엔티티
      * @param response AI 서버의 전력 이상 탐지 응답
      */
-    @Transactional
     private void saveAnomalyToDB(PowerPlant powerPlant, PowerAnomalyDetectionResponse response) {
         Anomaly anomaly = Anomaly.builder()
                 .powerPlant(powerPlant)
@@ -609,7 +613,6 @@ public class AiIntegrationService {
      * @param panelId 패널 ID
      * @param response AI 서버의 이미지 이상 탐지 응답
      */
-    @Transactional
     private void saveVisionAnomalyToDB(PowerPlant powerPlant, String panelId, VisionAnomalyDetectionResponse response) {
         Anomaly anomaly = Anomaly.builder()
                 .powerPlant(powerPlant)

@@ -58,6 +58,12 @@ public class PowerPlant {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    @Column(nullable = false)
+    private Integer nx; // 기상청 격자 X 좌표
+
+    @Column(nullable = false)
+    private Integer ny; // 기상청 격자 Y 좌표
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
@@ -74,4 +80,3 @@ public class PowerPlant {
     }
 
 }
-

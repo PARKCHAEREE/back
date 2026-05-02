@@ -40,10 +40,12 @@ public class DataInitConfig {
                 // 관리자 계정에 연결된 1번 발전소 자동으로 생성
                 if (powerPlantRepository.findById(1L).isEmpty()) {
                     PowerPlant plant = PowerPlant.builder()
-                            .name("서울 1호 태양광")
-                            .location("서울특별시")
+                            .name("전북 익산 1호 태양광")
+                            .location("전북특별자치도 익산시")
                             .capacity(100.0)
                             .panelCount(500)
+                            .nx(59)   // (기상청 서울 좌표)
+                            .ny(94)
                             .user(admin)
                             .active(true)
                             .build();
