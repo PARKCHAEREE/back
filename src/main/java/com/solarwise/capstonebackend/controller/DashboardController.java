@@ -2,6 +2,7 @@ package com.solarwise.capstonebackend.controller;
 
 import com.solarwise.capstonebackend.dto.ApiResponse;
 import com.solarwise.capstonebackend.dto.DashboardSummaryDto;
+import com.solarwise.capstonebackend.dto.MeasurementCsvUploadResult;
 import com.solarwise.capstonebackend.dto.MeasurementSeriesDto;
 import com.solarwise.capstonebackend.service.MeasurementService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -9,10 +10,12 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
 
@@ -46,6 +49,27 @@ public class DashboardController {
 
         DashboardSummaryDto response = measurementService.getDashboardSummary(plantId, Long.parseLong(userId));
         return ResponseEntity.ok(ApiResponse.success(response, "대시보드 요약 조회 성공"));
+    }
+
+    /**
+     * 실측 CSV 업로드
+     */
+    @PostMapping(value = "/measurements/upload-csv", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "실측 CSV 업로드", description = "자문가 제공 실측 CSV를 시계열 계측 데이터로 저장")
+    public ResponseEntity<ApiResponse<MeasurementCsvUploadResult>> uploadMeasurementsCsv(
+            @PathVariable Long plantId,
+            @RequestPart("file") MultipartFile file) {
+
+        String userId = (String) SecurityContextHolder.getContext()
+                .getAuthentication()
+                .getPrincipal();
+
+        log.info("실측 CSV 업로드: plantId={}, userId={}, file={}", plantId, userId, file.getOriginalFilename());
+
+        MeasurementCsvUploadResult response = measurementService.uploadMeasurementCsv(
+                plantId, Long.parseLong(userId), file);
+        return ResponseEntity.ok(ApiResponse.success(response, "실측 CSV 업로드 성공"));
     }
 
     /**

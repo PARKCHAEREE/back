@@ -17,5 +17,8 @@ public interface PowerPlantRepository extends JpaRepository<PowerPlant, Long> {
 
     Optional<PowerPlant> findByIdAndUserId(Long id, Long userId);
 
+    /** CSV V_SITE_ID 기반 발전소 조회 (DataInitConfig 중복 방지용) */
+    Optional<PowerPlant> findBySiteId(String siteId);
+
 }
 

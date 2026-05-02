@@ -22,6 +22,8 @@ public class MeasurementDto {
 
     private Double powerKw; // 발전 전력 (kW)
 
+    private Double energyKwh; // 측정 구간 발전량 (kWh)
+
     private Double temperature; // 온도 (℃)
 
     private Double irradiance; // 일사량 (W/m²)
