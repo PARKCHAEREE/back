@@ -43,3 +43,9 @@ application-mysql.properties
 application-local.properties
 application-prod.properties
 
+### CSV 실측 데이터 (외부 유출 금지) ###
+# 자문가 제공 원본 데이터는 Git에 올리지 않습니다.
+data/csv/measurements/*.csv
+data/csv/samples/*.csv
+# 단, README.md와 폴더 구조는 유지
+!data/csv/README.md

@@ -271,9 +271,9 @@ public class AiIntegrationService {
         Double forecast = 100.0; // TODO: ForecastRepository에서 최근 예측값 조회
         Double actual = 95.0;   // TODO: EnergyLogRepository에서 최근 실제값 조회
 
-        // 기상 데이터 조회
-        int nx = 60; // TODO: PowerPlant에서 좌표 조회
-        int ny = 127;
+        // 발전소 KMA 격자 좌표 사용 (없으면 충남 서천군 추정값)
+        int nx = powerPlant.getKmaGridNx() != null ? powerPlant.getKmaGridNx() : 56;
+        int ny = powerPlant.getKmaGridNy() != null ? powerPlant.getKmaGridNy() : 65;
         Map<String, Double> weatherData = fetchRealTimeWeather(nx, ny);
 
         LocalDateTime now = LocalDateTime.now();
@@ -349,9 +349,10 @@ public class AiIntegrationService {
         PowerPlant plant = powerPlantRepository.findById(powerPlantId)
                 .orElseThrow(() -> new IllegalArgumentException("발전소를 찾을 수 없습니다. ID: " + powerPlantId));
 
-        // TODO: 발전소 Entity에 기상청 API 호출을 위한 nx, ny 좌표가 저장되어 있어야 합니다. 여기서는 임시값을 사용합니다.
-        int nx = 60; // 예시: 서울특별시
-        int ny = 127;
+        // 발전소 엔티티에 저장된 KMA 격자 좌표 사용 (DataInitConfig에서 초기 설정)
+        // kmaGridNx/kmaGridNy가 없으면 충남 서천군 추정값 사용
+        int nx = plant.getKmaGridNx() != null ? plant.getKmaGridNx() : 56;
+        int ny = plant.getKmaGridNy() != null ? plant.getKmaGridNy() : 65;
         Map<String, Double> weatherData = fetchRealTimeWeather(nx, ny);
 
         LocalDateTime now = LocalDateTime.now();
@@ -454,9 +455,9 @@ public class AiIntegrationService {
         PowerPlant powerPlant = powerPlantRepository.findById(powerPlantId)
                 .orElseThrow(() -> new IllegalArgumentException("발전소를 찾을 수 없습니다. ID: " + powerPlantId));
 
-        // 기상 데이터 조회
-        int nx = 60; // TODO: PowerPlant에서 좌표 조회
-        int ny = 127;
+        // 발전소 KMA 격자 좌표 사용 (없으면 충남 서천군 추정값)
+        int nx = powerPlant.getKmaGridNx() != null ? powerPlant.getKmaGridNx() : 56;
+        int ny = powerPlant.getKmaGridNy() != null ? powerPlant.getKmaGridNy() : 65;
         Map<String, Double> weatherData = fetchRealTimeWeather(nx, ny);
 
         LocalDateTime now = LocalDateTime.now();

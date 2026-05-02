@@ -31,14 +31,29 @@ public class EnergyLog {
     @Column(nullable = false)
     private Double powerKw; // 실제 발전 전력 (kW)
 
-    @Column(nullable = false)
-    private Double temperature; // 온도 (℃)
+    @Column(name = "energy_kwh")
+    private Double energyKwh; // 측정 구간 발전량 (kWh)
 
-    @Column(nullable = false)
-    private Double irradiance; // 일사량 (W/m²)
+    /**
+     * 온도 (℃) — CSV 누락 시 보간값으로 채워짐.
+     * 기상청 API 연동 전까지 CSV 실측값 사용.
+     */
+    @Column
+    private Double temperature;
 
-    @Column(nullable = false)
-    private Double humidity; // 습도 (%)
+    /**
+     * 일사량 (W/m²) — 현재 CSV에 직접값 없음.
+     * 추후 기상청 API 또는 OpenWeather 과거예보 연동으로 채울 예정.
+     */
+    @Column
+    private Double irradiance;
+
+    /**
+     * 습도 (%) — CSV 누락 시 보간값으로 채워짐.
+     * 기상청 API 연동 전까지 CSV 실측값 사용.
+     */
+    @Column
+    private Double humidity;
 
     @Column(nullable = false)
     private LocalDateTime timestamp;
