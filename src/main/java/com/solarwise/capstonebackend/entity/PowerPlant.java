@@ -37,10 +37,38 @@ public class PowerPlant {
     private Integer panelCount; // 패널 개수
 
     @Column(length = 100)
-    private String inverterModel; // 인버터 모델
+    private String inverterModel; // 인버터 모델 및 수량 (예: "986.375kW 인버터 × 11대")
 
     @Column(length = 100)
     private String sensorSerialNumber; // 센서 시리얼 번호
+
+    /** 기상청 API 연동용 - 발전소 GPS 위도 (V_GPS_Y) */
+    @Column(name = "latitude")
+    private Double latitude;
+
+    /** 기상청 API 연동용 - 발전소 GPS 경도 (V_GPS_X) */
+    @Column(name = "longitude")
+    private Double longitude;
+
+    /**
+     * 기상청 단기예보 격자 X 좌표 (nx).
+     * Lambert Conformal Conic 변환값 - 충남 서천군 기준 약 56.
+     * KMA 격자 변환 도구로 정확한 값 확인 후 업데이트 필요.
+     */
+    @Column(name = "kma_grid_nx")
+    private Integer kmaGridNx;
+
+    /**
+     * 기상청 단기예보 격자 Y 좌표 (ny).
+     * Lambert Conformal Conic 변환값 - 충남 서천군 기준 약 65.
+     * KMA 격자 변환 도구로 정확한 값 확인 후 업데이트 필요.
+     */
+    @Column(name = "kma_grid_ny")
+    private Integer kmaGridNy;
+
+    /** 자문가 제공 CSV의 V_SITE_ID (예: KR10025001) */
+    @Column(name = "site_id", length = 50)
+    private String siteId;
 
     @Column(length = 50, columnDefinition = "VARCHAR(50) DEFAULT 'ACTIVE'")
     private String status; // ACTIVE, INACTIVE 등
@@ -57,12 +85,6 @@ public class PowerPlant {
 
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
-
-    @Column(nullable = false)
-    private Integer nx; // 기상청 격자 X 좌표
-
-    @Column(nullable = false)
-    private Integer ny; // 기상청 격자 Y 좌표
 
     @PrePersist
     protected void onCreate() {

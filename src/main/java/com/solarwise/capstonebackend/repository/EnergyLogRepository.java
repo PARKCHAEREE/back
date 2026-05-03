@@ -16,6 +16,8 @@ public interface EnergyLogRepository extends JpaRepository<EnergyLog, Long> {
 
     List<EnergyLog> findByPowerPlantIdAndTimestampBetween(Long powerPlantId, LocalDateTime start, LocalDateTime end);
 
+    List<EnergyLog> findByPowerPlantIdAndTimestampBetweenOrderByTimestampAsc(Long powerPlantId, LocalDateTime start, LocalDateTime end);
+
     Optional<EnergyLog> findTopByPowerPlantIdOrderByTimestampDesc(Long powerPlantId);
 
 }

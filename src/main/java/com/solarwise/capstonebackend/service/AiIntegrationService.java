@@ -11,6 +11,7 @@ import com.solarwise.capstonebackend.dto.ai.WeatherForecastDto;
 import com.solarwise.capstonebackend.dto.ai.XaiExplanationRequest;
 import com.solarwise.capstonebackend.dto.ai.XaiExplanationResponse;
 import com.solarwise.capstonebackend.entity.Anomaly;
+import com.solarwise.capstonebackend.entity.EnergyLog;
 import com.solarwise.capstonebackend.entity.Forecast;
 import com.solarwise.capstonebackend.entity.PowerPlant;
 import com.solarwise.capstonebackend.entity.WeatherData;
@@ -61,6 +62,7 @@ public class AiIntegrationService {
 
     private final RestTemplate restTemplate;
     private final PowerPlantRepository powerPlantRepository;
+    private final EnergyLogRepository energyLogRepository;
     private final ForecastRepository forecastRepository;
     private final AnomalyRepository anomalyRepository;
     private final WeatherDataFormatterUtil weatherDataFormatterUtil;
@@ -90,8 +92,8 @@ public class AiIntegrationService {
         PowerPlant powerPlant = powerPlantRepository.findById(plantId)
                 .orElseThrow(() -> new BusinessException("발전소를 찾을 수 없습니다. ID: " + plantId, HttpStatus.NOT_FOUND));
 
-        int nx = powerPlant.getNx();
-        int ny = powerPlant.getNy();
+        int nx = powerPlant.getKmaGridNx();
+        int ny = powerPlant.getKmaGridNy();
 
         String baseDate = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
         String baseTime = "0500"; // 단기예보 기준 시간
@@ -105,7 +107,6 @@ public class AiIntegrationService {
 
         try {
             String jsonResponse = restTemplate.getForObject(url, String.class);
-            log.info(" 기상청 실제 응답 원본: {}", jsonResponse);
             WeatherData weatherData = weatherDataFormatterUtil.parseKmaResponse(jsonResponse, powerPlant);
 
             // DB에 저장
@@ -149,7 +150,7 @@ public class AiIntegrationService {
                 double humidity = row[5].trim().isEmpty() ? 0.0 : Double.parseDouble(row[5].trim());
 
                 // 일사량 등은 데이터에 없는 경우가 많으므로 배열 길이 체크
-                double irradiance = (row.length > 6 && !row[6].trim().isEmpty()) ? Double.parseDouble(row[6].trim()) : 0.0;
+                double irradiance = 0.0; // 향후 OpenWeather API 연동을 위해 빈칸으로 두고 고정값 설정
                 double cloudCover = 0.0; // 운량 정보가 없다면 0.0 처리
 
                 WeatherData data = WeatherData.builder()
@@ -239,7 +240,8 @@ public class AiIntegrationService {
      * @param powerPlant 발전소 엔티티
      * @param response AI 서버의 예측 응답
      */
-    private void saveForecastsToDB(PowerPlant powerPlant, AiPredictionResponse response) {
+    @Transactional
+    protected void saveForecastsToDB(PowerPlant powerPlant, AiPredictionResponse response) {
         if (response.getForecastSeries() == null || response.getForecastSeries().isEmpty()) {
             log.warn("예측 시계열 데이터가 없습니다.");
             return;
@@ -589,7 +591,8 @@ public class AiIntegrationService {
      * @param powerPlant 발전소 엔티티
      * @param response AI 서버의 전력 이상 탐지 응답
      */
-    private void saveAnomalyToDB(PowerPlant powerPlant, PowerAnomalyDetectionResponse response) {
+    @Transactional
+    protected void saveAnomalyToDB(PowerPlant powerPlant, PowerAnomalyDetectionResponse response) {
         Anomaly anomaly = Anomaly.builder()
                 .powerPlant(powerPlant)
                 .type("POWER")
@@ -613,7 +616,8 @@ public class AiIntegrationService {
      * @param panelId 패널 ID
      * @param response AI 서버의 이미지 이상 탐지 응답
      */
-    private void saveVisionAnomalyToDB(PowerPlant powerPlant, String panelId, VisionAnomalyDetectionResponse response) {
+    @Transactional
+    protected void saveVisionAnomalyToDB(PowerPlant powerPlant, String panelId, VisionAnomalyDetectionResponse response) {
         Anomaly anomaly = Anomaly.builder()
                 .powerPlant(powerPlant)
                 .type("VISION")
