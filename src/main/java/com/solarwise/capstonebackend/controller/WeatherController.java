@@ -29,14 +29,12 @@ public class WeatherController {
     public ResponseEntity<ApiResponse<Map<String, Double>>> getCurrentWeather(
             @RequestParam Long plantId) {
 
-        WeatherData weatherData = aiIntegrationService.fetchRealTimeWeather(plantId);
-
-        // WeatherData를 Map으로 변환
+        // 시뮬레이션 모드: 고정 기상 데이터 반환
         Map<String, Double> weatherMap = Map.of(
-                "temperature", weatherData.getTemperature(),
-                "humidity", weatherData.getHumidity(),
-                "irradiance", weatherData.getIrradiance(),
-                "cloudCover", weatherData.getCloudCover()
+                "temperature", 25.0,
+                "humidity", 60.0,
+                "irradiance", 800.0,
+                "cloudCover", 0.3
         );
 
         // 공통 응답 포맷으로 감싸서 리턴
@@ -59,9 +57,10 @@ public class WeatherController {
     @PostMapping(value = "/plants/{plantId}/weather/upload-advisor-csv", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<Map<String, Object>>> uploadAdvisorDataCsv(
             @PathVariable Long plantId,
-            @RequestPart("file") MultipartFile file) {
+            @RequestPart("file") MultipartFile file,
+            @RequestParam(defaultValue = "false") boolean enableDemoCheat) {
 
-        Map<String, Object> result = weatherDataImportService.importAdvisorCsvToEnergyLog(plantId, file);
+        Map<String, Object> result = weatherDataImportService.importAdvisorCsvToEnergyLog(plantId, file, enableDemoCheat);
         return ResponseEntity.ok(ApiResponse.success(result, "우양 CSV 데이터 적재 완료"));
     }
 }

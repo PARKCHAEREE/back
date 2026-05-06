@@ -24,7 +24,6 @@ import com.solarwise.capstonebackend.repository.PowerPlantRepository;
 import com.solarwise.capstonebackend.repository.WeatherDataRepository;
 import com.solarwise.capstonebackend.repository.VisionAnalysisRepository;
 import com.solarwise.capstonebackend.util.CsvParsingUtil;
-import com.solarwise.capstonebackend.util.WeatherDataFormatterUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -65,63 +64,14 @@ public class AiIntegrationService {
     private final EnergyLogRepository energyLogRepository;
     private final ForecastRepository forecastRepository;
     private final AnomalyRepository anomalyRepository;
-    private final WeatherDataFormatterUtil weatherDataFormatterUtil;
 
     private final CsvParsingUtil csvParsingUtil;
     private final WeatherDataRepository weatherDataRepository;
     private final VisionAnalysisRepository visionAnalysisRepository;
-
-    @Value("${kma.api.key:}")
-    private String apiKey;
+    private final SimulationService simulationService;
 
     @Value("${ai.server.base-url}")
     private String aiServerBaseUrl;
-
-    /**
-     * 기상청 단기예보 API를 호출하여 특정 발전소 위치의 실시간 날씨 데이터를 조회하고 DB에 저장합니다.
-     *
-     * @param plantId 날씨 데이터를 조회할 발전소의 ID
-     * @return 조회된 기상 데이터를 담은 WeatherData 엔티티
-     * @throws BusinessException API 호출 실패 또는 데이터 파싱 오류 시
-     */
-    public WeatherData fetchRealTimeWeather(Long plantId) {
-        if (apiKey == null || apiKey.isBlank()) {
-            throw new BusinessException("kma.api.key 설정이 필요합니다.", HttpStatus.INTERNAL_SERVER_ERROR);
-        }
-
-        PowerPlant powerPlant = powerPlantRepository.findById(plantId)
-                .orElseThrow(() -> new BusinessException("발전소를 찾을 수 없습니다. ID: " + plantId, HttpStatus.NOT_FOUND));
-
-        int nx = powerPlant.getKmaGridNx();
-        int ny = powerPlant.getKmaGridNy();
-
-        String baseDate = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
-        String baseTime = "0500"; // 단기예보 기준 시간
-
-        String url = String.format(
-                "http://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getVilageFcst?serviceKey=%s&pageNo=1&numOfRows=10&dataType=JSON&base_date=%s&base_time=%s&nx=%d&ny=%d",
-                apiKey, baseDate, baseTime, nx, ny
-        );
-
-        log.info("기상청 API 호출: 발전소 ID={}, (X:{}, Y:{})", plantId, nx, ny);
-
-        try {
-            String jsonResponse = restTemplate.getForObject(url, String.class);
-            WeatherData weatherData = weatherDataFormatterUtil.parseKmaResponse(jsonResponse, powerPlant);
-
-            // DB에 저장
-            weatherDataRepository.save(weatherData);
-            log.info("기상 데이터 DB 저장 완료: 발전소 ID={}, 온도={}℃", plantId, weatherData.getTemperature());
-
-            return weatherData;
-
-        } catch (BusinessException e) {
-            throw e;
-        } catch (Exception e) {
-            log.error("기상청 API 호출 실패: 발전소 ID={}, 오류={}", plantId, e.getMessage());
-            throw new BusinessException("기상청 API 통신 중 오류가 발생했습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
-        }
-    }
 
     /**
      * 과거 기상 데이터가 담긴 CSV 파일을 업로드하여 DB에 저장합니다.
@@ -287,13 +237,12 @@ public class AiIntegrationService {
         Double forecast = 100.0; // TODO: ForecastRepository에서 최근 예측값 조회
         Double actual = 95.0;   // TODO: EnergyLogRepository에서 최근 실제값 조회
 
-        // 기상 데이터 조회
-        WeatherData weatherDataEntity = fetchRealTimeWeather(powerPlantId);
-        LocalDateTime now = LocalDateTime.now();
-        Double ambientTemperature = weatherDataEntity.getTemperature();
-        Double irradiation = weatherDataEntity.getIrradiance();
-        Double windSpeed = 0.0; // WeatherData에 windSpeed 없음, 기본값
-        Double humidity = weatherDataEntity.getHumidity();
+        // 기상 데이터 조회 (시뮬레이션 모드: 고정값 사용)
+        LocalDateTime now = simulationService.getVirtualCurrentTime();
+        Double ambientTemperature = 25.0; // 시뮬레이션 고정값
+        Double irradiation = 800.0; // 시뮬레이션 고정값
+        Double windSpeed = 2.0; // 시뮬레이션 고정값
+        Double humidity = 60.0; // 시뮬레이션 고정값
         Double moduleTemperature = ambientTemperature + (irradiation * 20);
 
         // 명세서 6-4에 맞는 XAI 요청 DTO 생성
@@ -363,12 +312,13 @@ public class AiIntegrationService {
                 .orElseThrow(() -> new IllegalArgumentException("발전소를 찾을 수 없습니다. ID: " + powerPlantId));
 
         // TODO: 발전소 Entity에 기상청 API 호출을 위한 nx, ny 좌표가 저장되어 있어야 합니다. 여기서는 임시값을 사용합니다.
-        WeatherData weatherDataEntity = fetchRealTimeWeather(powerPlantId);
-        LocalDateTime now = LocalDateTime.now();
-        Double ambientTemperature = weatherDataEntity.getTemperature();
-        Double irradiation = weatherDataEntity.getIrradiance();
-        Double windSpeed = 0.0; // WeatherData에 windSpeed 없음, 기본값
-        Double humidity = weatherDataEntity.getHumidity();
+
+        // 시뮬레이션 모드: 고정 기상 데이터 사용
+        LocalDateTime now = simulationService.getVirtualCurrentTime();
+        Double ambientTemperature = 25.0; // 시뮬레이션 고정값
+        Double irradiation = 800.0; // 시뮬레이션 고정값
+        Double windSpeed = 2.0; // 시뮬레이션 고정값
+        Double humidity = 60.0; // 시뮬레이션 고정값
         Double moduleTemperature = ambientTemperature + (irradiation * 20); // 간단한 추정식
 
         // 과거 데이터 (히스토리) 조회
@@ -464,11 +414,10 @@ public class AiIntegrationService {
         PowerPlant powerPlant = powerPlantRepository.findById(powerPlantId)
                 .orElseThrow(() -> new IllegalArgumentException("발전소를 찾을 수 없습니다. ID: " + powerPlantId));
 
-        // 기상 데이터 조회
-        WeatherData weatherDataEntity = fetchRealTimeWeather(powerPlantId);
-        LocalDateTime now = LocalDateTime.now();
-        Double ambientTemperature = weatherDataEntity.getTemperature();
-        Double irradiation = weatherDataEntity.getIrradiance();
+        // 기상 데이터 조회 (시뮬레이션 모드: 고정값 사용)
+        LocalDateTime now = simulationService.getVirtualCurrentTime();
+        Double ambientTemperature = 25.0; // 시뮬레이션 고정값
+        Double irradiation = 800.0; // 시뮬레이션 고정값
         Double moduleTemperature = ambientTemperature + (irradiation * 20);
 
         PowerAnomalyDetectionRequest requestDto = PowerAnomalyDetectionRequest.builder()
@@ -537,9 +486,9 @@ public class AiIntegrationService {
         PowerPlant powerPlant = powerPlantRepository.findById(powerPlantId)
                 .orElseThrow(() -> new IllegalArgumentException("발전소를 찾을 수 없습니다. ID: " + powerPlantId));
 
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = simulationService.getVirtualCurrentTime();
 
-        // Note: 실제 구현에서는 multipart/form-data로 이미지 전송
+        // Note: 실제 구��에서는 multipart/form-data로 이미지 전송
         // 여기서는 BASE64 인코딩된 이미지 데이터를 가정
         Map<String, Object> requestBody = Map.of(
                 "plant_id", "PLANT_" + String.format("%03d", powerPlant.getId()),
@@ -602,7 +551,7 @@ public class AiIntegrationService {
                 .cause(String.format("예측값 대비 %.2f%% 편차", calculateDeviation(response)))
                 .recommendedAction(response.getRecommendation())
                 .status("OPEN")
-                .detectedAt(LocalDateTime.now())
+                .detectedAt(simulationService.getVirtualCurrentTime())
                 .build();
 
         anomalyRepository.save(anomaly);
@@ -621,13 +570,13 @@ public class AiIntegrationService {
         Anomaly anomaly = Anomaly.builder()
                 .powerPlant(powerPlant)
                 .type("VISION")
-                .summary("패널 영상 이상 탐지")
+                .summary("패널 이상 탐지")
                 .description(String.format("패널 %s: %s 감지", panelId, response.getDefectType()))
                 .severity(response.getSeverity())
                 .cause(String.format("결함 유형: %s (신뢰도: %.2f%%)", response.getDefectType(), response.getConfidence() * 100))
                 .recommendedAction(response.getRecommendation())
                 .status("OPEN")
-                .detectedAt(LocalDateTime.now())
+                .detectedAt(simulationService.getVirtualCurrentTime())
                 .build();
 
         anomalyRepository.save(anomaly);

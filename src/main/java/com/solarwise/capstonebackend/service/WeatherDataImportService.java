@@ -4,9 +4,11 @@ import com.opencsv.bean.CsvToBeanBuilder;
 import com.solarwise.capstonebackend.dto.AdvisorDataCsvDto;
 import com.solarwise.capstonebackend.entity.EnergyLog;
 import com.solarwise.capstonebackend.entity.PowerPlant;
+import com.solarwise.capstonebackend.entity.WeatherData;
 import com.solarwise.capstonebackend.exception.BusinessException;
 import com.solarwise.capstonebackend.repository.EnergyLogRepository;
 import com.solarwise.capstonebackend.repository.PowerPlantRepository;
+import com.solarwise.capstonebackend.repository.WeatherDataRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -35,17 +37,19 @@ public class WeatherDataImportService {
 
     private final EnergyLogRepository energyLogRepository;
     private final PowerPlantRepository powerPlantRepository;
+    private final WeatherDataRepository weatherDataRepository;
 
     /**
-     * 우양 제공 태양광/기상 데이터 CSV를 파싱하여 EnergyLog로 적재합니다.
+     * 우양 제공 태양광/기상 데이터 CSV를 파싱하여 EnergyLog와 WeatherData로 적재합니다.
      *
      * @param powerPlantId 데이터를 적재할 발전소의 ID
      * @param file 업로드된 CSV 파일
+     * @param enableDemoCheat 캡스톤 시연용 가짜 이상 탐지 조작 활성화 여부
      * @return 성공 및 실패 건수를 포함한 처리 결과 Map
      * @throws BusinessException CSV 파싱 실패 또는 발전소를 찾을 수 없을 경우
      */
     @Transactional
-    public Map<String, Object> importAdvisorCsvToEnergyLog(Long powerPlantId, MultipartFile file) {
+    public Map<String, Object> importAdvisorCsvToEnergyLog(Long powerPlantId, MultipartFile file, boolean enableDemoCheat) {
         if (file.isEmpty()) {
             throw new BusinessException("파일이 비어있습니다.", HttpStatus.BAD_REQUEST);
         }
@@ -62,40 +66,50 @@ public class WeatherDataImportService {
         }
 
         List<EnergyLog> energyLogList = new ArrayList<>();
+        List<WeatherData> weatherDataList = new ArrayList<>();
         int successCount = 0;
         int failureCount = 0;
 
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
         for (AdvisorDataCsvDto csvDto : csvDataList) {
             try {
-                String rawTime = csvDto.getVTime().trim();
-                if (rawTime.length() == 10) {
-                    rawTime += "0000";
-                }
-                // V_TIME을 LocalDateTime으로 변환
+                String rawTime = csvDto.getTime().trim();
                 LocalDateTime timestamp = LocalDateTime.parse(rawTime, formatter);
 
+                // 캡스톤 시연용 가짜 이상 탐지 조작: 10월 2일 오후 1시(13시) 이후 실제 발전량을 40%로 깎음
+                Double powerKw = csvDto.getActual() != null ? csvDto.getActual() : 0.0;
+                if (enableDemoCheat && timestamp.isAfter(LocalDateTime.of(2026, 3, 15, 13, 0))) {
+                    powerKw *= 0.4; // 13시 이후부터 이상 발생 시작!
+                }
+
                 // EnergyLog 엔티티 빌드
-                // D_PERIOD_GEN_KWH -> powerKw
-                // D_TEMP -> temperature
-                // D_HUMIDITY -> humidity
-                // D_UVI -> irradiance (일사량으로 매핑)
-                // D_CLOUDS -> cloudCover (구름량을 0.0~1.0 범위로 정규화, 단위는 %)
                 EnergyLog energyLog = EnergyLog.builder()
                         .powerPlant(powerPlant)
-                        .powerKw(csvDto.getDPeriodGenKwh() != null ? csvDto.getDPeriodGenKwh() : 0.0)
-                        .temperature(csvDto.getDTemp() != null ? csvDto.getDTemp() : 0.0)
-                        .humidity(csvDto.getDHumidity() != null ? csvDto.getDHumidity() : 0.0)
-                        .irradiance(csvDto.getDUvi() != null ? csvDto.getDUvi() : 0.0)
+                        .powerKw(powerKw)
+                        .temperature(csvDto.getTemp() != null ? csvDto.getTemp() : 0.0)
+                        .humidity(csvDto.getHumi() != null ? csvDto.getHumi() : 0.0)
+                        .irradiance(csvDto.getIrradiance() != null ? csvDto.getIrradiance() : 0.0)
                         .timestamp(timestamp)
                         .build();
 
                 energyLogList.add(energyLog);
+
+                // WeatherData 엔티티 빌드
+                WeatherData weatherData = WeatherData.builder()
+                        .powerPlant(powerPlant)
+                        .temperature(csvDto.getTemp() != null ? csvDto.getTemp() : 0.0)
+                        .humidity(csvDto.getHumi() != null ? csvDto.getHumi() : 0.0)
+                        .irradiance(csvDto.getIrradiance() != null ? csvDto.getIrradiance() : 0.0)
+                        .cloudCover(csvDto.getClou() != null ? csvDto.getClou() / 100.0 : 0.0)
+                        .timestamp(timestamp)
+                        .build();
+
+                weatherDataList.add(weatherData);
                 successCount++;
 
             } catch (DateTimeParseException e) {
-                log.warn("시간 포맷 파싱 실패 - V_TIME: {}, 오류: {}", csvDto.getVTime(), e.getMessage());
+                log.warn("시간 포맷 파싱 실패 - TIME: {}, 오류: {}", csvDto.getTime(), e.getMessage());
                 failureCount++;
             } catch (NumberFormatException e) {
                 log.warn("숫자 포맷 파싱 실패 - 데이터: {}, 오류: {}", csvDto, e.getMessage());
@@ -109,7 +123,8 @@ public class WeatherDataImportService {
         // 성공한 데이터만 DB에 적재
         if (!energyLogList.isEmpty()) {
             energyLogRepository.saveAll(energyLogList);
-            log.info("EnergyLog 데이터 적재 완료! 발전소 ID: {}, 성공: {}건, 실패: {}건", powerPlantId, successCount, failureCount);
+            weatherDataRepository.saveAll(weatherDataList);
+            log.info("데이터 적재 완료! 발전소 ID: {}, EnergyLog: {}건, WeatherData: {}건, 실패: {}건", powerPlantId, energyLogList.size(), weatherDataList.size(), failureCount);
         } else {
             log.warn("적재할 유효한 데이터가 없습니다. 발전소 ID: {}", powerPlantId);
         }
@@ -154,4 +169,3 @@ public class WeatherDataImportService {
     }
 
 }
-

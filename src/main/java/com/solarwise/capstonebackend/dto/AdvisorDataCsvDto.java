@@ -9,7 +9,7 @@ import lombok.NoArgsConstructor;
 /**
  * 우양 제공 태양광/기상 데이터 CSV 바인딩 DTO
  * - OpenCSV의 @CsvBindByName을 사용하여 CSV 컬럼과 자동 매핑
- * - 컬럼: V_TIME, D_PERIOD_GEN_KWH, D_TEMP, D_HUMIDITY, D_UVI, D_CLOUDS
+ * - 컬럼: TIME, ACTUAL, PREDICTION, TEMP, HUMI, CLOU, IRRADIANCE
  */
 @Data
 @Builder
@@ -17,23 +17,25 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class AdvisorDataCsvDto {
 
-    @CsvBindByName(column = "V_TIME")
-    private String vTime; // 시간 (예: "2024-01-01 00:00:00")
+    @CsvBindByName(column = "TIME")
+    private String time; // 시간 (예: "2024-01-01 00:00:00")
 
-    @CsvBindByName(column = "D_PERIOD_GEN_KWH")
-    private Double dPeriodGenKwh; // 발전량 (kWh/시간)
+    @CsvBindByName(column = "ACTUAL")
+    private Double actual; // 실제 발전량 (kWh/시간)
 
-    @CsvBindByName(column = "D_TEMP")
-    private Double dTemp; // 기온 (℃)
+    @CsvBindByName(column = "PREDICTION")
+    private Double prediction; // 예측 발전량 (kWh/시간)
 
-    @CsvBindByName(column = "D_HUMIDITY")
-    private Double dHumidity; // 습도 (%)
+    @CsvBindByName(column = "TEMP")
+    private Double temp; // 기온 (℃)
 
-    @CsvBindByName(column = "D_UVI")
-    private Double dUvi; // 자외선 지수 또는 일사량 (W/m² 또는 MJ/m²)
+    @CsvBindByName(column = "HUMI")
+    private Double humi; // 습도 (%)
 
-    @CsvBindByName(column = "D_CLOUDS")
-    private Double dClouds; // 구름량 (%)
+    @CsvBindByName(column = "CLOU")
+    private Double clou; // 구름량 (%)
+
+    @CsvBindByName(column = "IRRADIANCE")
+    private Double irradiance; // 일사량 (W/m²)
 
 }
-
