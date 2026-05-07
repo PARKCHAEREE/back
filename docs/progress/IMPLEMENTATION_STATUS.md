@@ -1,4 +1,4 @@
-# 백엔드 API 구현 현황 (2026-04-12)
+# 백엔드 API 구현 현황 (2026-05-07)
 
 ## 현재 진행 상황
 
@@ -25,9 +25,9 @@
 - AI 예측 API 2종 구현
   - `GET /api/v1/plants/{plantId}/forecasts` - 예측 발전량
   - `GET /api/v1/plants/{plantId}/forecasts/explanations` - 예측 설명
-- 데이터 파이프라인 API 2종 구현
-  - `POST /api/v1/plants/{plantId}/weather/upload-csv` - 과거 기상 데이터 CSV 업로드
-  - `GET /api/v1/weather/current` - 실시간 동네 날씨 조회
+- 데이터 파이프라인 API 1종 구현
+  - `POST /api/v1/plants/{plantId}/weather/upload-advisor-csv` - AI 팀 전처리 CSV 업로드 (TIME, ACTUAL, PREDICTION, TEMP, HUMI, CLOU, IRRADIANCE)
+- ⚠️ **아키텍처 변경**: 기상청(KMA), OpenWeather API 등 외부 기상 API 연동 **전면 폐기**
 
 ### ✅ Phase 4: 이상 탐지 상세 및 예측 데이터 저장 (완료)
 - ✅ 예측 데이터 저장 엔티티 구현
@@ -46,8 +46,19 @@
   - XAI 설명: `requestXaiExplanation()`
   - 이상 탐지: `detectPowerAnomaly()`, `detectVisionAnomaly()`
 - ✅ `VisionAnalysis` 엔티티 생성 (이미지 분석 결과 및 XAI 신뢰도 저장)
+- ✅ **가상 시간 시뮬레이션 엔진 완성**
+  - `SimulationService`: 인메모리 가상 시간 관리 (2026-03-15 13:00 시작)
+  - `SimulationController`: 시뮬레이션 제어 API 3종
+    - `GET /api/v1/simulation/time` - 현재 가상 시간 조회
+    - `POST /api/v1/simulation/tick` - 가상 시간 1시간 진행
+    - `POST /api/v1/simulation/trigger-drone-error` - 드론 오류 트리거 (시연용)
+  - **핵심 원칙**: `LocalDateTime.now()` 전면 금지 → `SimulationService.getVirtualCurrentTime()` 사용
+  - **DB 스키마 변경 없음**: 인메모리로만 시간 제어 (모든 엔티티의 시간은 가상 시간 기준)
+- ✅ 드론 비전 AI 시연 자동화
+  - 백엔드 스케줄러가 주기적으로 AI 서버와 통신
+  - `/trigger-drone-error` API 호출 시 의도적으로 파손된 이미지 전송
+  - enableDemoCheat 파라미터로 시연용 anomaly 주입 (CSV 업로드 시)
 - 🔄 구현 필요:
-  - `POST /api/v1/plants/{plantId}/vision/analyze` - 패널 이미지 분석 컨트롤러
   - `EnergyAggregationService` 시간별/일별 데이터 집계 배치 스케줄러
 
 ### 🔄 Phase 6: 챗 및 알림 (대기)
@@ -109,7 +120,8 @@ src/main/java/com/solarwise/capstonebackend/
 │   ├── DashboardController.java     [v1/plants/{id} - 대시보드, 측정]
 │   ├── AnomalyController.java       [v1/plants/{id}/anomalies - 이상]
 │   ├── ForecastController.java      [v1/plants/{id}/forecasts - 예측]
-│   └── WeatherController.java       [v1/weather, v1/plants/{id}/weather - 날씨]
+│   ├── WeatherController.java       [v1/plants/{id}/weather - 날씨]
+│   └── SimulationController.java    [v1/simulation - 시뮬레이션 제어] ✨
 │
 ├── service/
 │   ├── AuthService.java             [회원가입, 로그인, 사용자 정보]
@@ -118,7 +130,9 @@ src/main/java/com/solarwise/capstonebackend/
 │   ├── DashboardService.java        [대시보드 요약]
 │   ├── AnomalyService.java          [이상 탐지 조회]
 │   ├── EnergyAggregationService.java [에너지 집계 - 🔄]
-│   └── AiIntegrationService.java    [AI 연동 - ✅ 비동기 처리 완료]
+│   ├── AiIntegrationService.java    [AI 연동 - ✅ 비동기 처리 완료]
+│   ├── WeatherDataImportService.java [CSV 임포트 - ✅]
+│   └── SimulationService.java       [가상 시간 관리] ✨
 │
 ├── entity/
 │   ├── User.java
@@ -144,6 +158,7 @@ src/main/java/com/solarwise/capstonebackend/
 │   ├── MeasurementSeriesDto.java
 │   ├── AnomalyDto.java
 │   ├── EnergyLogDto.java
+│   ├── AdvisorDataCsvDto.java      [CSV 업로드용 DTO - ✅]
 │   └── ai/
 │       ├── AiApiResponse.java
 │       ├── AiPredictionRequest.java
@@ -164,7 +179,9 @@ src/main/java/com/solarwise/capstonebackend/
 │   ├── EnergyLogRepository.java
 │   ├── AnomalyRepository.java
 │   ├── WeatherDataRepository.java
-│   └── ForecastRepository.java       [발전량 예측 저장소 - ✅]
+│   ├── ForecastRepository.java       [발전량 예측 저장소 - ✅]
+│   ├── ForecastExplanationRepository.java [예측 설명 저장소 - ✅]
+│   └── VisionAnalysisRepository.java [이미지 분석 저장소 - ✅]
 │
 ├── security/
 │   ├── JwtAuthenticationFilter.java
@@ -183,8 +200,7 @@ src/main/java/com/solarwise/capstonebackend/
 │   └── DataInitConfig.java
 │
 ├── util/
-│   ├── CsvParsingUtil.java
-│   └── WeatherDataFormatterUtil.java
+│   └── CsvParsingUtil.java
 │
 └── CapstoneBackendApplication.java  [@EnableAsync 적용]
 ```
@@ -276,8 +292,7 @@ src/main/java/com/solarwise/capstonebackend/
 
 ### P3 (3주차)
 1. 알림 이력 관리 및 메일 발송 통합
-2. 기상청 API 연동 주기적 수집 스케줄러
-3. 권한 세분화
+2. 권한 세분화
 
 ## 주의사항
 
