@@ -10,7 +10,7 @@
 
 - ✅ **feature/auth-system** 브랜치에서 RDS 통합 및 자문가 데이터 API 구현 완료
 - ✅ 모든 변경사항 **develop 브랜치에 merge** 및 **푸시** 완료
-- 🔄 박채리님의 **로컬 환경 동기화 및 검증 필요**
+- 🔄 RDS 환경 동기화 및 검증 필요
 
 ---
 
@@ -285,7 +285,7 @@ BUILD SUCCESSFUL
 - ✅ 자문가 데이터 API 구현
 - ✅ 모든 테스트 통과
 
-### 8-2) 박채리님이 진행 중인 작업 (AI/데이터 연동)
+### 8-2) 현재 진행 중인 작업 (AI/데이터 연동)
 - ✅ `AiIntegrationService` - 예측 및 이상 탐지 로직
 - ✅ CSV 파이프라인 - `WeatherDataImportService`
 - ✅ 비동기 처리 - `@Async`, `CompletableFuture`
@@ -294,12 +294,12 @@ BUILD SUCCESSFUL
 ### 8-3) 협업 포인트
 | 항목 | 상태 | 담당 | 비고 |
 |------|------|------|------|
-| RDS 통합 | ✅ 완료 | 이승윤 | MySQL 8.0.44 기반 |
-| JWT 인증 | ✅ 완료 | 이승윤 | Bearer 토큰 기반 |
-| API 응답 | ✅ 완료 | 이승윤 | `ApiResponse<T>` 통일 |
-| AI 클라이언트 | ✅ 완료 | 박채리 | `AiIntegrationService` |
-| CSV 임포트 | ✅ 완료 | 박채리 | `WeatherDataImportService` |
-| 시간 관리 | ✅ 완료 | 박채리 | `SimulationService` 가상 시간 |
+| RDS 통합 | ✅ 완료 | 백엔드 API | MySQL 8.0.44 기반 |
+| JWT 인증 | ✅ 완료 | 백엔드 API | Bearer 토큰 기반 |
+| API 응답 | ✅ 완료 | 백엔드 API | `ApiResponse<T>` 통일 |
+| AI 클라이언트 | ✅ 완료 | AI/데이터 연동 | `AiIntegrationService` |
+| CSV 임포트 | ✅ 완료 | AI/데이터 연동 | `WeatherDataImportService` |
+| 시간 관리 | ✅ 완료 | AI/데이터 연동 | `SimulationService` 가상 시간 |
 
 ---
 
@@ -316,8 +316,8 @@ BUILD SUCCESSFUL
 - **백업**: 프로덕션 데이터이므로 조작 시 주의
 
 ### 동시성 주의
-- 이승윤: `develop` 브랜치에서 API 구현 중
-- 박채리: `origin/feature/ai-integration`에서 작업 후 merge 예정
+- **백엔드 API 팀**: `develop` 브랜치에서 작업
+- **AI/데이터 연동 팀**: `feature/ai-integration`에서 작업 후 merge
 - **충돌 방지**: 같은 파일 동시 수정 금지, 정기적으로 develop 브랜치 풀
 
 ---
@@ -369,7 +369,7 @@ BUILD FAILED
 
 ## ✅ 최종 체크리스트
 
-박채리님께서 아래 모든 항목을 확인해주세요:
+아래 모든 항목을 확인해주세요:
 
 - [ ] 1-1) develop 브랜치 체크아웃 완료
 - [ ] 1-3) `git pull origin develop` 실행 완료
@@ -386,12 +386,12 @@ BUILD FAILED
 
 ---
 
-## 📞 연락
+## 📞 지원
 
 문제 발생 시:
 1. 이 문서 다시 읽어보기
 2. 콘솔 로그 및 에러 메시지 수집
-3. 이승윤에게 보고
+3. 팀과 함께 문제 분석
 
 **예상 소요 시간**: 약 30분 ~ 1시간
 
