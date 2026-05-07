@@ -42,10 +42,11 @@ out/
 application-mysql.properties
 application-local.properties
 application-prod.properties
+application-rds.properties
 
-### CSV ½ÇÃø µ¥ÀÌÅÍ (¿ÜºÎ À¯Ãâ ±ÝÁö) ###
-# ÀÚ¹®°¡ Á¦°ø ¿øº» µ¥ÀÌÅÍ´Â Git¿¡ ¿Ã¸®Áö ¾Ê½À´Ï´Ù.
+### CSV ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ (ï¿½Üºï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½) ###
+# ï¿½Ú¹ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Í´ï¿½ Gitï¿½ï¿½ ï¿½Ã¸ï¿½ï¿½ï¿½ ï¿½Ê½ï¿½ï¿½Ï´ï¿½.
 data/csv/measurements/*.csv
 data/csv/samples/*.csv
-# ´Ü, README.md¿Í Æú´õ ±¸Á¶´Â À¯Áö
+# ï¿½ï¿½, README.mdï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 !data/csv/README.md

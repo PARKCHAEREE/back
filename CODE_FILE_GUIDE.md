@@ -1,7 +1,7 @@
 # 📁 SolarWise Backend - 코드 파일 역할 가이드
 
 > **프로젝트**: CapstoneBackend (SolarWise - 태양광 발전 관리 시스템)  
-> **최종 업데이트**: 2026-04-12  
+> **최종 업데이트**: 2026-04-29  
 > **기술 스택**: Spring Boot 4.0.5 · Java 21 · Spring Security · JPA · JWT
 
 ---

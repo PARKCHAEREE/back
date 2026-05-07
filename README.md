@@ -9,7 +9,7 @@
 - **프레임워크**: Spring Boot 4.0.5
 - **Java**: 21
 - **빌드**: Gradle
-- **데이터베이스**: MySQL
+- **데이터베이스**: AWS RDS (MySQL)
 
 ## 핵심 기능
 
@@ -34,7 +34,7 @@
 
 ### 사전 요구사항
 - Java 21 이상
-- MySQL 5.7 이상 (또는 Docker)
+- AWS RDS (MySQL) 접속 정보
 - Git
 
 ### 설치 및 실행
@@ -44,16 +44,15 @@
 git clone <repository-url>
 cd CapstoneBackend
 
-# 2. 데이터베이스 설정 (application.properties 수정)
-# spring.datasource.url=jdbc:mysql://localhost:3306/solarwise
-# spring.datasource.username=root
-# spring.datasource.password=password
+# 2. RDS 설정 파일 준비
+# src/main/resources/application-rds.properties.example
+# -> src/main/resources/application-rds.properties 로 복사 후 값 입력
 
 # 3. 빌드
 ./gradlew clean build
 
-# 4. 애플리케이션 실행
-./gradlew bootRun
+# 4. 애플리케이션 실행 (RDS 프로필)
+./gradlew bootRun --args='--spring.profiles.active=rds'
 
 # 5. Swagger UI 접속
 # http://localhost:8080/swagger-ui.html
@@ -215,14 +214,13 @@ logging.level.com.solarwise.capstonebackend=DEBUG
 
 ## 문제 해결
 
-### MySQL 연결 실패
+### RDS 연결 실패
 ```bash
-# MySQL 서버 상태 확인
-mysql -h localhost -u root -p
+# RDS 연결 확인
+mysql -h <RDS_ENDPOINT> -u <DB_USER> -p solarwise
 
-# MySQL 없으면 Docker로 실행
-docker run --name mysql -e MYSQL_ROOT_PASSWORD=password \
-  -p 3306:3306 mysql:8.0
+# rds 프로필로 실행 확인
+./gradlew bootRun --args='--spring.profiles.active=rds'
 ```
 
 ### 포트 충돌 (8080 사용 중)
@@ -231,9 +229,9 @@ docker run --name mysql -e MYSQL_ROOT_PASSWORD=password \
 server.port=8081
 ```
 
-### 테스트 실패 (MySQL 필요)
-테스트는 자동으로 H2 메모리 DB 사용
-(`src/test/resources/application.properties` 참고)
+### 테스트 실패
+테스트는 H2 메모리 DB를 사용합니다. (테스트 전용)
+운영/개발 실행은 RDS 프로필을 사용하세요.
 
 ## 팀 협업
 
