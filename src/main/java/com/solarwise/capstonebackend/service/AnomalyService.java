@@ -30,6 +30,7 @@ public class AnomalyService {
 
     private final AnomalyRepository anomalyRepository;
     private final PowerPlantRepository powerPlantRepository;
+    private final SimulationService simulationService;
 
     /**
      * 최근 이상 탐지 조회
@@ -82,7 +83,7 @@ public class AnomalyService {
 
         anomaly.setStatus(normalizedStatus);
         if ("RESOLVED".equals(normalizedStatus)) {
-            anomaly.setResolvedAt(LocalDateTime.now());
+            anomaly.setResolvedAt(simulationService.getVirtualCurrentTime());
         } else {
             anomaly.setResolvedAt(null);
         }

@@ -22,6 +22,7 @@ public class DashboardService {
     private final PowerPlantRepository powerPlantRepository;
     private final EnergyAggregationService energyAggregationService;
     private final AnomalyService anomalyService;
+    private final SimulationService simulationService;
 
     /**
      * 발전소 대시보드 조회
@@ -30,14 +31,17 @@ public class DashboardService {
         PowerPlant plant = powerPlantRepository.findById(powerPlantId)
                 .orElseThrow(() -> new ResourceNotFoundException("발전소를 찾을 수 없습니다."));
 
+        // ✅ FIXED: 가상 시간 기준으로 조회 (파라미터가 없으면 가상 현재 시간 사용)
+        LocalDateTime virtualNow = simulationService.getVirtualCurrentTime();
+        LocalDateTime actualEndTime = endTime != null ? endTime : virtualNow;
+
         return DashboardResponse.builder()
                 .powerPlantId(powerPlantId)
                 .plantName(plant.getName())
-                .dateRange(LocalDateTime.now())
-                .energyData(energyAggregationService.getAggregatedEnergyData(powerPlantId, startTime, endTime))
+                .dateRange(actualEndTime)
+                .energyData(energyAggregationService.getAggregatedEnergyData(powerPlantId, startTime, actualEndTime))
                 .recentAnomalies(anomalyService.getRecentAnomalies(powerPlantId, 10))
                 .build();
     }
 
 }
-

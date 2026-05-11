@@ -11,17 +11,15 @@ import com.solarwise.capstonebackend.dto.ai.WeatherForecastDto;
 import com.solarwise.capstonebackend.dto.ai.XaiExplanationRequest;
 import com.solarwise.capstonebackend.dto.ai.XaiExplanationResponse;
 import com.solarwise.capstonebackend.entity.Anomaly;
-import com.solarwise.capstonebackend.entity.EnergyLog;
+import com.solarwise.capstonebackend.entity.PlantFeatureLog;
 import com.solarwise.capstonebackend.entity.Forecast;
 import com.solarwise.capstonebackend.entity.PowerPlant;
-import com.solarwise.capstonebackend.entity.WeatherData;
 import com.solarwise.capstonebackend.entity.VisionAnalysis;
 import com.solarwise.capstonebackend.exception.BusinessException;
 import com.solarwise.capstonebackend.repository.AnomalyRepository;
-import com.solarwise.capstonebackend.repository.EnergyLogRepository;
+import com.solarwise.capstonebackend.repository.PlantFeatureLogRepository;
 import com.solarwise.capstonebackend.repository.ForecastRepository;
 import com.solarwise.capstonebackend.repository.PowerPlantRepository;
-import com.solarwise.capstonebackend.repository.WeatherDataRepository;
 import com.solarwise.capstonebackend.repository.VisionAnalysisRepository;
 import com.solarwise.capstonebackend.util.CsvParsingUtil;
 import lombok.RequiredArgsConstructor;
@@ -39,7 +37,6 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
@@ -61,12 +58,11 @@ public class AiIntegrationService {
 
     private final RestTemplate restTemplate;
     private final PowerPlantRepository powerPlantRepository;
-    private final EnergyLogRepository energyLogRepository;
+    private final PlantFeatureLogRepository plantFeatureLogRepository;
     private final ForecastRepository forecastRepository;
     private final AnomalyRepository anomalyRepository;
 
     private final CsvParsingUtil csvParsingUtil;
-    private final WeatherDataRepository weatherDataRepository;
     private final VisionAnalysisRepository visionAnalysisRepository;
     private final SimulationService simulationService;
 
@@ -87,7 +83,7 @@ public class AiIntegrationService {
                 .orElseThrow(() -> new IllegalArgumentException("발전소를 찾을 수 없습니다. ID: " + powerPlantId));
 
         List<String[]> csvData = csvParsingUtil.parseCsv(file);
-        List<WeatherData> weatherDataList = new ArrayList<>();
+        List<PlantFeatureLog> weatherDataList = new ArrayList<>();
         int successCount = 0;
 
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
@@ -103,13 +99,16 @@ public class AiIntegrationService {
                 double irradiance = 0.0; // 향후 OpenWeather API 연동을 위해 빈칸으로 두고 고정값 설정
                 double cloudCover = 0.0; // 운량 정보가 없다면 0.0 처리
 
-                WeatherData data = WeatherData.builder()
-                        .powerPlant(powerPlant) // 방금 찾은 발전소 매핑
-                        .timestamp(LocalDateTime.parse(row[2].trim(), formatter))
-                        .temperature(temperature)
-                        .humidity(humidity)
+                PlantFeatureLog data = PlantFeatureLog.builder()
+                        .powerPlantId(powerPlant.getId())
+                        .measuredAt(LocalDateTime.parse(row[2].trim(), formatter))
+                        .temp(temperature)
+                        .humi(humidity)
                         .irradiance(irradiance)
-                        .cloudCover(cloudCover)
+                        .clou(cloudCover)
+                        .actual(0.0) // 기상 데이터에는 발전량 없음
+                        .prediction(0.0)
+                        .wisp(0.0)
                         .build();
 
                 weatherDataList.add(data);
@@ -122,7 +121,7 @@ public class AiIntegrationService {
             }
         }
 
-        weatherDataRepository.saveAll(weatherDataList);
+        plantFeatureLogRepository.saveAll(weatherDataList);
         log.info("기상 데이터 CSV 적재 완료! 발전소 ID: {}, 총 {}건 저장", powerPlantId, successCount);
 
         return Map.of(
@@ -198,6 +197,7 @@ public class AiIntegrationService {
         }
 
         List<Forecast> forecasts = new ArrayList<>();
+        LocalDateTime virtualNow = simulationService.getVirtualCurrentTime();
         for (com.solarwise.capstonebackend.dto.ai.ForecastDto forecastDto : response.getForecastSeries()) {
             Forecast forecast = Forecast.builder()
                     .powerPlant(powerPlant)
@@ -207,6 +207,8 @@ public class AiIntegrationService {
                     .modelVersion(forecastDto.getModelVersion())
                     .modelNotes(forecastDto.getModelNotes())
                     .status("COMPLETED")
+                    .createdAt(virtualNow)
+                    .updatedAt(virtualNow)
                     .build();
             forecasts.add(forecast);
         }
@@ -417,8 +419,8 @@ public class AiIntegrationService {
         // 기상 데이터 조회 (시뮬레이션 모드: 고정값 사용)
         LocalDateTime now = simulationService.getVirtualCurrentTime();
         Double ambientTemperature = 25.0; // 시뮬레이션 고정값
-        Double irradiation = 800.0; // 시뮬레이션 고정값
-        Double moduleTemperature = ambientTemperature + (irradiation * 20);
+        Double irradiance = 800.0; // 시뮬레이션 고정값
+        Double moduleTemperature = ambientTemperature + (irradiance * 20);
 
         PowerAnomalyDetectionRequest requestDto = PowerAnomalyDetectionRequest.builder()
                 .plantId("PLANT_" + String.format("%03d", powerPlant.getId()))
@@ -426,7 +428,7 @@ public class AiIntegrationService {
                 .datetime(now)
                 .actualPower(actualPower)
                 .predictedPower(predictedPower)
-                .irradiation(irradiation)
+                .irradiation(irradiance)
                 .ambientTemperature(ambientTemperature)
                 .moduleTemperature(moduleTemperature)
                 .build();
@@ -567,6 +569,7 @@ public class AiIntegrationService {
      */
     @Transactional
     protected void saveVisionAnomalyToDB(PowerPlant powerPlant, String panelId, VisionAnomalyDetectionResponse response) {
+        LocalDateTime virtualNow = simulationService.getVirtualCurrentTime();
         Anomaly anomaly = Anomaly.builder()
                 .powerPlant(powerPlant)
                 .type("VISION")
@@ -576,7 +579,9 @@ public class AiIntegrationService {
                 .cause(String.format("결함 유형: %s (신뢰도: %.2f%%)", response.getDefectType(), response.getConfidence() * 100))
                 .recommendedAction(response.getRecommendation())
                 .status("OPEN")
-                .detectedAt(simulationService.getVirtualCurrentTime())
+                .detectedAt(virtualNow)
+                .createdAt(virtualNow)
+                .updatedAt(virtualNow)
                 .build();
 
         anomalyRepository.save(anomaly);
@@ -587,6 +592,7 @@ public class AiIntegrationService {
                 .imageUrl(null) // TODO: 이미지 URL 저장 로직 추가
                 .analysisResult(String.format("결함 유형: %s, 신뢰도: %.2f%%, 심각도: %s",
                         response.getDefectType(), response.getConfidence() * 100, response.getSeverity()))
+                .createdAt(virtualNow)
                 .build();
 
         visionAnalysisRepository.save(visionAnalysis);

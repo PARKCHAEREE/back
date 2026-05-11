@@ -5,6 +5,7 @@ import com.solarwise.capstonebackend.dto.DashboardSummaryDto;
 import com.solarwise.capstonebackend.dto.MeasurementCsvUploadResult;
 import com.solarwise.capstonebackend.dto.MeasurementSeriesDto;
 import com.solarwise.capstonebackend.service.MeasurementService;
+import com.solarwise.capstonebackend.service.SimulationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +32,7 @@ import java.time.LocalDateTime;
 public class DashboardController {
 
     private final MeasurementService measurementService;
+    private final SimulationService simulationService;
 
     /**
      * 대시보드 요약 조회
@@ -87,8 +89,9 @@ public class DashboardController {
                 .getAuthentication()
                 .getPrincipal();
 
-        // 기본값: 최근 24시간
-        LocalDateTime endTime = to != null ? to : LocalDateTime.now();
+        // 가상 시간 기준으로 기본값 설정 (최근 24시간)
+        LocalDateTime virtualNow = simulationService.getVirtualCurrentTime();
+        LocalDateTime endTime = to != null ? to : virtualNow;
         LocalDateTime startTime = from != null ? from : endTime.minusHours(24);
 
         log.info("측정 데이터 조회: plantId={}, userId={}, from={}, to={}", plantId, userId, startTime, endTime);

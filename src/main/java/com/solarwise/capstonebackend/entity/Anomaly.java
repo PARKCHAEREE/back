@@ -65,8 +65,7 @@ public class Anomaly {
 
     @PrePersist
     protected void onCreate() {
-        createdAt = LocalDateTime.now();
-        updatedAt = LocalDateTime.now();
+        // 시간 설정은 Service 계층에서 수행 (SimulationService.getVirtualCurrentTime() 사용)
         if (status == null) {
             status = "OPEN";
         }
@@ -74,7 +73,7 @@ public class Anomaly {
 
     @PreUpdate
     protected void onUpdate() {
-        updatedAt = LocalDateTime.now();
+        // 시간 설정은 Service 계층에서 수행
     }
 
 }
