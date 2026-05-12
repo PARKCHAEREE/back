@@ -1,9 +1,9 @@
 package com.solarwise.capstonebackend.config;
-
 import com.solarwise.capstonebackend.entity.PowerPlant;
 import com.solarwise.capstonebackend.entity.User;
 import com.solarwise.capstonebackend.repository.PowerPlantRepository;
 import com.solarwise.capstonebackend.repository.UserRepository;
+import com.solarwise.capstonebackend.service.SimulationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
@@ -11,6 +11,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
 
 @Slf4j
 @Configuration
@@ -20,11 +22,13 @@ public class DataInitConfig {
     private final UserRepository userRepository;
     private final PowerPlantRepository powerPlantRepository;
     private final PasswordEncoder passwordEncoder;
+    private final SimulationService simulationService;
 
     @Bean
     @Transactional
     public CommandLineRunner initData() {
         return args -> {
+            LocalDateTime virtualNow = simulationService.getVirtualCurrentTime();
             // 백엔드 담당자(이승윤) 로컬 개발 및 Swagger 확인용 관리자 계정 자동 생성
             if (userRepository.findByEmail("admin@solarwise.com").isEmpty()) {
                 User admin = User.builder()
@@ -33,6 +37,8 @@ public class DataInitConfig {
                         .name("테스트관리자")
                         .role("MANAGER")
                         .active(true)
+                        .createdAt(virtualNow)
+                        .updatedAt(virtualNow)
                         .build();
                 userRepository.save(admin);
                 log.info("테스트 관리자 계정 자동 생성 완료 (admin@solarwise.com / password123)");
@@ -61,6 +67,8 @@ public class DataInitConfig {
                             .siteId("KR10025001")
                             .user(admin)
                             .active(true)
+                            .createdAt(virtualNow)
+                            .updatedAt(virtualNow)
                             .build();
                     powerPlantRepository.save(plant);
                     log.info("장항 태양광 발전소 자동 생성 완료 (KR10025001, 10,850.125kW)");

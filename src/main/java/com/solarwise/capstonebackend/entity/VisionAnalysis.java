@@ -37,6 +37,6 @@ public class VisionAnalysis {
 
     @PrePersist
     protected void onCreate() {
-        createdAt = java.time.LocalDateTime.now();
+        // 시간 설정은 Service 계층에서 수행 (SimulationService.getVirtualCurrentTime() 사용)
     }
 }

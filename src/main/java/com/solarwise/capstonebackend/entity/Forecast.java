@@ -64,8 +64,7 @@ public class Forecast {
 
     @PrePersist
     protected void onCreate() {
-        createdAt = LocalDateTime.now();
-        updatedAt = LocalDateTime.now();
+        // 시간 설정은 Service 계층에서 수행 (SimulationService.getVirtualCurrentTime() 사용)
         if (status == null) {
             status = "PENDING";
         }
@@ -73,7 +72,7 @@ public class Forecast {
 
     @PreUpdate
     protected void onUpdate() {
-        updatedAt = LocalDateTime.now();
+        // 시간 설정은 Service 계층에서 수행
     }
 
 }

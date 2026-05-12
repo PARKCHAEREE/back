@@ -13,6 +13,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
+
 /**
  * 인증 서비스
  * - 사용자 회원가입, 로그인 처리
@@ -26,6 +28,7 @@ public class AuthService {
     private final UserRepository userRepository;
     private final JwtUtil jwtUtil;
     private final PasswordEncoder passwordEncoder;
+    private final SimulationService simulationService;
 
     /**
      * 사용자 회원가입
@@ -35,12 +38,15 @@ public class AuthService {
             throw new BusinessException("이미 가입된 이메일입니다.");
         }
 
+        LocalDateTime virtualNow = simulationService.getVirtualCurrentTime();
         User user = User.builder()
                 .email(request.getEmail())
                 .password(passwordEncoder.encode(request.getPassword()))
                 .name(request.getName())
                 .role(request.getRole())
                 .active(true)
+                .createdAt(virtualNow)
+                .updatedAt(virtualNow)
                 .build();
 
         User savedUser = userRepository.save(user);

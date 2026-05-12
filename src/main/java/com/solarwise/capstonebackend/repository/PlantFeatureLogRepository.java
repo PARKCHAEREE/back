@@ -21,5 +21,15 @@ public interface PlantFeatureLogRepository extends JpaRepository<PlantFeatureLog
             LocalDateTime from,
             LocalDateTime to
     );
-}
+    
 
+    List<PlantFeatureLog> findByPowerPlantIdAndMeasuredAtLessThanEqualOrderByMeasuredAtDesc(
+            Long powerPlantId,
+            LocalDateTime measuredAt,
+            Pageable pageable
+    );
+
+    void deleteByPowerPlantId(Long powerPlantId);
+
+    PlantFeatureLog findTopByPowerPlantIdOrderByMeasuredAtDesc(Long powerPlantId);
+}

@@ -88,8 +88,7 @@ public class PowerPlant {
 
     @PrePersist
     protected void onCreate() {
-        createdAt = LocalDateTime.now();
-        updatedAt = LocalDateTime.now();
+        // 시간 설정은 Service 계층에서 수행 (SimulationService.getVirtualCurrentTime() 사용)
         active = true;
         if (status == null) {
             status = "ACTIVE";
@@ -98,7 +97,7 @@ public class PowerPlant {
 
     @PreUpdate
     protected void onUpdate() {
-        updatedAt = LocalDateTime.now();
+        // 시간 설정은 Service 계층에서 수행
     }
 
 }
