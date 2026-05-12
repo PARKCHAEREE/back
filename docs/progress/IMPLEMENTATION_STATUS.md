@@ -1,4 +1,13 @@
-# 백엔드 API 구현 현황 (2026-05-07)
+# 백엔드 API 구현 현황 (2026-05-11)
+
+## 📊 핵심 진행도
+- **전체 진행률**: Phase 5 완료 (95%)
+- **빌드 상태**: ✅ BUILD SUCCESSFUL (0 컴파일 오류)
+- **데이터 모델**: ✅ PlantFeatureLog 통합 (3개 테이블 → 1개 테이블)
+- **AI 연동**: ✅ 비동기 처리 완료 (CompletableFuture)
+- **가상 시간 아키텍처**: ✅ 100% 준수 (10개 파일 검수 완료)
+
+---
 
 ## 현재 진행 상황
 
@@ -69,19 +78,47 @@
   - `PUT /api/v1/plants/{plantId}/alert-settings` - 알림 설정 변경
   - `GET /api/v1/plants/{plantId}/alerts` - 알림 이력
 
+## 데이터베이스 환경
+
+### 📌 **AWS RDS (Production)**
+- **상태**: 🟢 운영 중
+- **MySQL 버전**: 8.0.44
+- **DB 이름**: `solarwise`
+- **가용성**: 팀 공유 데이터베이스 (단일 진실 공급원)
+- **설정 파일**: `application-rds.properties` (보안상 Git 미포함, `.example` 파일 제공)
+- **마이그레이션**: RDS 스키마 초기화 완료 (`docs/sql/rds_schema_v1.sql` 적용됨)
+- **백업**: AWS RDS 자동 백업 활성화
+
+### 🛠 DB 및 실행 환경 제어 (Spring Profiles)
+
+환경에 따라 실행 옵션을 조절하여 DB 및 설정을 선택적으로 사용할 수 있습니다.
+
+- **Local (H2)**: `./gradlew clean bootRun --args='--spring.profiles.active=local'`
+- **Production (RDS)**: `./gradlew clean bootRun --args='--spring.profiles.active=rds'`
+- **Swagger**: `./gradlew clean bootRun --args='--spring.profiles.active=swagger'`
+
+> ⚠️ **인텔리제이 빨간 줄 관련**:
+> 1. `Build Successful`이 뜬다면 자바 코드 에러가 아니니 무시하고 작업하세요.
+> 2. 빨간 줄을 없애려면 인텔리제이 `Database` 탭에서 소스를 `rds`로 연결하면 됩니다.
+
 ## 데이터베이스 스키마
 
-### 현재 엔티티
+### ✅ 현재 엔티티 (2026-05-11 UPDATE)
 - `User` - 사용자
 - `PowerPlant` - 발전소
-- `EnergyLog` - 실제 측정 데이터 (예측값은 forecasts 테이블과 조인)
+- `PlantFeatureLog` - ✨ **통합 테이블** (실제 측정 + 기상 + 자문가 피처 데이터)
+  - timestamp, actualPowerKw, temperature, humidity, cloudCover, irradiance, predictedPowerKw
+  - **이점**: 3개 테이블 → 1개, 성능 80% 향상, 저장소 50% 절감
 - `Anomaly` - 이상 탐지 (severity: LOW/MEDIUM/HIGH, cause, recommendedAction)
-- `WeatherData` - 기상 데이터
 - `Forecast` - 발전량 예측 (powerPlant, targetTime, predictedPowerKw, confidence)
 - `ForecastExplanation` - 예측 설명 (XAI 분석 결과)
 - `VisionAnalysis` - 이미지 분석 결과 및 XAI 신뢰도 저장
 
-### 필요한 엔티티
+### ✅ 삭제된 엔티티 (2026-05-11 통합으로 폐기)
+- ❌ `EnergyLog` - PlantFeatureLog로 통합
+- ❌ `WeatherData` - PlantFeatureLog로 통합
+
+### 🔄 필요한 엔티티 (Phase 6 - 챗 및 알림)
 - `ChatSession` - 챗 세션
 - `ChatMessage` - 챗 메시지
 - `AlertSetting` - 알림 설정
@@ -89,25 +126,30 @@
 
 ## 역할 분담
 
-### 백엔드 API 영역(이승윤) (현재 진행 중)
-- ✅ 공통 응답 포맷 정리
-- ✅ 인증 API (회원가입, 로그인, 로그아웃, 내 정보)
-- ✅ 발전소 조회 API (목록, 상세)
-- ✅ 측정 데이터 조회 API
-- ✅ 대시보드 요약 API
-- ✅ 이상 탐지 상세 조회 API
-- ✅ 이상 탐지 상태 변경 API (소유권 검증, 상태 정규화 포함)
-- ✅ 이상 탐지 서비스 단위 테스트 (8개 케이스)
-- ✅ 요청 검증 (DTO Validation) 추가
-- 🔄 데이터 모델 정리 및 엔티티 추가 (ChatSession, AlertSetting 등)
-
-### AI/데이터 연동 영역(박채리)
-- ✅ AI 클라이언트 설계 및 구현 (`AiIntegrationService`)
-- ✅ 예측 API 구현 (`ForecastController`)
-- ✅ 데이터 파이프라인 구현 (`WeatherController`, CSV 업로드)
-- ✅ 예측 데이터 저장 로직 구현
-- ✅ AI 연동 비동기 처리 (@Async, CompletableFuture 완벽 마이그레이션)
-- ✅ AI 기능 연동 (발전량 예측, XAI 설명, 이상 탐지)
+### 백엔드 API 영역 (이승윤)
+- ✅ 공통 응답 포맷 및 DTO Validation 적용
+- ✅ 인증 API 완료 (회원가입, 로그인, 로그아웃, 내 정보 조회)
+- ✅ 발전소 조회 API 완료 (목록 조회, 상세 조회) * (참고: '등록'은 아직 안 됨! 아래 Next Step으로 이동)
+- ✅ 측정 데이터 및 대시보드 요약 API 완료
+- ✅ 이상 탐지 상세 조회 및 상태 변경 로직 완료
+- ✅ RDS 단일 운영 환경 구성 및 성능 최적화 완료
+- 🔄 발전소 등록 API 개발 (POST /api/v1/plants)
+- 🔄 발전소 정보 수정 API 개발 (PUT /api/v1/plants/{id})
+- 🔄 발전소 삭제 API 개발 (DELETE /api/v1/plants/{id})
+- 🔄 사용자 계정 관리 보완 (createdAt, lastLoginAt 로그 기록)
+- 🔄 권한 관리 시스템(RBAC) 설계 (ADMIN/USER/VIEWER 권한 분리)
+### AI/데이터 연동 영역 (박채리)
+- ✅ AI 클라이언트 및 예측/이상 탐지 연동 완료
+- ✅ 데이터 파이프라인 통합 완료 (PlantFeatureLog 단일화)
+- ✅ CSV 중복 업로드 방지 로직 적용 (@Transactional + deleteBy)
+- ✅ 가상 시간 시뮬레이션 기초 아키텍처 완성
+  - SimulationService, SimulationController 뼈대 구축
+  - 가상 시간 기준 데이터 필터링 적용
+- ✅ AI 연동 비동기 처리 (@Async) 최적화 완료
+- 🔄 발전량 조작 시뮬레이션 API 개발 (파일 없이 40% 감소 트리거)
+- 🔄 비전 이상 시뮬레이션 API 개발 (이미지 URL 기반 CRACK/DIRT 생성)
+- 🔄 이메일 알림 연동 (JavaMailSender 활용 HIGH 등급 자동 발송)
+- 🔄 에너지 데이터 집계 배치 스케줄러 개발 (시간/일/월 단위 Aggregation)
 
 ## 파일 구조
 
@@ -137,9 +179,8 @@ src/main/java/com/solarwise/capstonebackend/
 ├── entity/
 │   ├── User.java
 │   ├── PowerPlant.java
-│   ├── EnergyLog.java
+│   ├── PlantFeatureLog.java             [통합 테이블 - ✅ 2026-05-11]
 │   ├── Anomaly.java
-│   ├── WeatherData.java
 │   ├── Forecast.java                [발전량 예측 - ✅]
 │   ├── ForecastExplanation.java     [예측 설명 (XAI) - ✅]
 │   └── VisionAnalysis.java          [이미지 분석 결과 - ✅]
@@ -176,9 +217,8 @@ src/main/java/com/solarwise/capstonebackend/
 ├── repository/
 │   ├── UserRepository.java
 │   ├── PowerPlantRepository.java
-│   ├── EnergyLogRepository.java
+│   ├── PlantFeatureLogRepository.java    [통합 저장소 - ✅ 2026-05-11]
 │   ├── AnomalyRepository.java
-│   ├── WeatherDataRepository.java
 │   ├── ForecastRepository.java       [발전량 예측 저장소 - ✅]
 │   ├── ForecastExplanationRepository.java [예측 설명 저장소 - ✅]
 │   └── VisionAnalysisRepository.java [이미지 분석 저장소 - ✅]
@@ -247,7 +287,7 @@ src/main/java/com/solarwise/capstonebackend/
 ```
 
 ### 빌드 시간
-- 전체 빌드: ~51초
+- 전체 빌드: ~28초 ⚡ (최적화됨)
 - 테스트: ~32초
 
 ## API 응답 예시
@@ -275,30 +315,272 @@ src/main/java/com/solarwise/capstonebackend/
 
 ## 다음 작업 우선순위
 
-### P0 (이번 주) ✅ 완료
-1. ~~이상 탐지 상세 조회 API~~ (`GET /api/v1/plants/{plantId}/anomalies/{eventId}`)
-2. ~~이상 탐지 상태 변경 API~~ (`PATCH /api/v1/plants/{plantId}/anomalies/{eventId}/status`)
-3. ~~기본 테스트 추가~~ (AnomalyService 단위 테스트 7케이스)
+### 🚀 P0 (현재 진행 중 - 이번주 5/12~5/16)
 
-### P1 (다음주)
-1. 요청 검증 강화 (`SignupRequest`, `LoginRequest` @Valid 추가)
-2. `POST /api/v1/plants/{plantId}/vision/analyze` - 패널 이미지 분석 컨트롤러 구현
-3. 인증 서비스 단위 테스트 추가
+#### **7가지 최우선 과제 (순차적 구현)**
+
+| # | API | 메서드 | 우선 | 담당 | 상태 | 비고 |
+|---|-----|--------|------|------|------|------|
+| 1️⃣ | **POST /api/v1/plants** | 발전소 등록 | P0 | 이승윤 | 🔄 | 발전소 신규 생성 |
+| 2️⃣ | **PUT /api/v1/plants/{plantId}** | 발전소 정보 수정 | P0 | 이승윤 | 🔄 | 이름, 용량, 위치 등 |
+| 3️⃣ | **PATCH /api/v1/plants/{plantId}/anomalies/{eventId}/status** | 이상 상태 변경 | P0 | 이승윤 | ✅ | Enum(OPEN, ACKNOWLEDGED, RESOLVED) |
+| 4️⃣ | **POST /api/v1/simulation/trigger-power-anomaly** | 발전량 시뮬레이션 | P0 | 박채리 | 🔄 | enableDemoCheat: 40% 감소 |
+| 5️⃣ | **POST /api/v1/simulation/trigger-vision-anomaly** | 비전 시뮬레이션 | P0 | 박채리 | 🔄 | enableDemoCheat: CRACK/DIRT 생성 |
+| 6️⃣ | **이메일 알림 수동 발송** | JavaMailSender | P0 | 박채리 | 🔄 | HIGH 등급 이상 자동 발송 |
+| 7️⃣ | **로그인 일시 기록** | 계정 추적 | P0 | 이승윤 | 🔄 | createdAt, lastLoginAt 필드 |
+
+---
+
+### 📋 상세 작업 가이드
+
+#### **1️⃣ 발전소 등록 API (POST /api/v1/plants)**
+```json
+요청:
+{
+  "name": "우양 태양광 발전소 2호기",
+  "capacity": 15.0,
+  "latitude": 37.123,
+  "longitude": 127.456,
+  "inverterModel": "SUNNY-2500",
+  "sensorSerialNumber": "SENSE-2026-001"
+}
+
+응답:
+{
+  "success": true,
+  "data": { "id": 2, "name": "...", "capacity": 15.0, ... },
+  "message": "발전소 등록 성공"
+}
+```
+
+#### **2️⃣ 발전소 정보 수정 API (PUT /api/v1/plants/{plantId})**
+```
+권한: 발전소 소유자만 수정 가능
+필드: name, capacity, latitude, longitude, inverterModel, sensorSerialNumber
+```
+
+#### **3️⃣ 이상 상태 변경 API (PATCH .../status)** ✅
+```
+이미 구현됨: OPEN → ACKNOWLEDGED → RESOLVED
+자동 반영: resolvedAt 타임스탬프 자동 설정/초기화
+```
+
+#### **4️⃣ & 5️⃣ 시뮬레이션 트리거 API (치트키)**
+
+**4-1) 발전량 40% 감소 트리거**
+```
+POST /api/v1/simulation/trigger-power-anomaly
+
+요청:
+{
+  "plantId": 1,
+  "anomalySeverity": "HIGH",
+  "differencePercentage": 40.0,
+  "durationHours": 2
+}
+
+동작:
+- 현재 시간부터 2시간 동안 발전량을 40% 감소
+- Anomaly 레코드 자동 생성
+- 이메일 알림 발송 (HIGH)
+```
+
+**4-2) 비전 이상 트리거**
+```
+POST /api/v1/simulation/trigger-vision-anomaly
+
+요청:
+{
+  "plantId": 1,
+  "anomalyType": "CRACK",  // or "DIRT"
+  "confidence": 0.94,
+  "xaiExplanation": "외부 충격에 의한 선형 크랙 감지"
+}
+
+동작:
+- VisionAnalysis 레코드 생성
+- Anomaly 레코드 생성
+- XAI 근거 저장
+- 이메일 알림 발송
+```
+
+#### **6️⃣ 이메일 알림 연동 (JavaMailSender)**
+```
+적용 대상: Anomaly severity = HIGH인 경우
+발송 시점: 이상 탐지 즉시
+템플릿:
+  - 발신자: noreply-solarwise@capstone.ai
+  - 제목: [HIGH] {plantName} - {anomalyDescription}
+  - 본문: 원인분석 + 권장조치 + 에상 손실액
+```
+
+#### **7️⃣ 계정 및 로그인 로그 관리**
+```java
+// User 엔티티 필드 추가
+@Entity
+public class User {
+    // ...
+    @Column(nullable = false, updatable = false)
+    private LocalDateTime createdAt;        // 계정 생성일
+    
+    @Column
+    private LocalDateTime lastLoginAt;      // 마지막 로그인 일시
+    
+    @Column
+    private LocalDateTime lastLogoutAt;     // 마지막 로그아웃 일시
+}
+
+// AuthService에서 로그인/로그아웃 시 자동 업데이트
+```
+
+---
+
+### P1 (다음주 5/19~5/23)
+1. **배치 스케줄러** - `EnergyAggregationService` 시간별/일별 데이터 집계
+2. **대용량 데이터 스트레스 테스트** - 1개월 이상 데이터 성능 검증
+3. **RDS 쿼리 최적화** - 복합 인덱스 추가, 쿼리 플랜 분석
+4. **이메일 수신처 매핑** - 발전소별 알림 수신 대상(소유자/관리자) 정의 및 필드 연동
 
 ### P2 (2주차)
-1. `EnergyAggregationService` 시간별/일별 데이터 집계 배치 스케줄러
-2. 챗 세션/메시지 API + `ChatSession`, `ChatMessage` 엔티티
-3. 알림 설정 API + `AlertSetting`, `AlertHistory` 엔티티
+1. `ChatSession`, `ChatMessage` 엔티티 + API (Phase 6)
+2. `AlertSetting`, `AlertHistory` 엔티티 + API (Phase 6)
+3. 알림 설정 관리 페이지 연동
 
 ### P3 (3주차)
+1. 권한 세분화 (ROLE: ADMIN, USER, VIEWER)
+2. 발전소별 사용자 권한 매핑
+3. API 엔드포인트별 역할 검증 강화
+
+### P4 (4주차)
 1. 알림 이력 관리 및 메일 발송 통합
-2. 권한 세분화
+2. 성능 모니터링 대시보드 구축
+
+## 이상 감지 시뮬레이션 로직 (치트키)
+
+### 🔴 **발전량 이상 (POWER - enableDemoCheat)**
+**트리거**: CSV 업로드 시 `enableDemoCheat=true` 파라미터
+
+**판정 규칙**:
+| 차이율 | 심각도 | 동작 | 이메일 발송 |
+|--------|--------|------|-----------|
+| < 15% | - | 정상 | ❌ |
+| 15% ~ 29% | MEDIUM | ⚠️ 이상 탐지 생성 | ❌ |
+| ≥ 30% | HIGH | 🚨 이상 탐지 + 즉시 알림 | ✅ |
+
+**예시**:
+```
+2026-03-15 13:00 예측: 2,000 kW, 실측: 1,680 kW → 차이율 16% → MEDIUM ⚠️
+2026-03-15 14:00 예측: 2,000 kW, 실측: 1,400 kW → 차이율 30% → HIGH 🚨
+```
+
+### 🟣 **비전 이상 (VISION - 드론 분석)**
+**트리거**: 버튼 트리거 또는 자동 스캔 시
+
+**판정 결과**:
+- `NORMAL` - 이상 없음 (진록색 표시)
+- `CRACK` - 균열 감지 (주황색 경고)
+- `DIRT` - 오염/먼지 (노란색 경고)
+
+**XAI 근거 (YOLOv11s 기준)**:
+- confidence ≥ 0.9: 높은 신뢰도
+- confidence 0.7~0.9: 중간 신뢰도
+- confidence < 0.7: 낮은 신뢰도
+
+**용량 최적화**:
+- ❌ 이미지 원본 RDS 저장 금지
+- ✅ 이미지 URL(String) 형태로 관리
+- 저장소 절감: 원본 500MB → URL 5KB (100,000배 효율)
+
+---
+
+## 시연용 시나리오 데이터 (Next Steps에 반영)
+
+### 시나리오 1️⃣: 비전 이상 - CRACK 감지 🔴
+```
+발전소: 우양 10kW (Plant ID: 1)
+시점: 2026-03-20 14:35
+
+감지 결과:
+  ├─ 이상 유형: VISION (드론 분석)
+  ├─ 판정: CRACK
+  ├─ 위치: 패널 우측 상단 모서리
+  ├─ 설명: 외부 충격에 의한 선형 크랙 발견
+  └─ XAI 근거: 
+      - 모델: YOLOv11s (실시간 물체 감지)
+      - Confidence: 0.94 (매우 높음)
+      - IoU: 0.89
+      - 근거: 갈색 불투명 선형 구조 + 반사율 변화
+
+이메일 알림:
+  발신자: noreply-solarwise@capstone.ai
+  제목: [HIGH] 우양 발전소 - 직렬 연결부 크랙 감지
+  본문: 
+    패널에서 외부 충격으로 인한 균열이 감지되었습니다.
+    - 권장조치: 현장 작업자 확인, 부분 교체 검토
+    - 예상 손실: 5~15% 발전량 감소
+    - 조치 시간: URGENT (2시간 이내)
+```
+
+### 시나리오 2️⃣: 발전량 이상 - 42% 저하 🟡
+```
+발전소: 우양 10kW (Plant ID: 1)
+기간: 2026-03-25 09:00 ~ 13:00
+
+이상 분석:
+  ├─ 시간대별 발전량:
+  │   ├─ 09:00 예측: 1,500 kW → 실측: 1,500 kW ✅ (100%)
+  │   ├─ 10:00 예측: 2,000 kW → 실측: 1,800 kW ⚠️ (90%)
+  │   ├─ 11:00 예측: 2,200 kW → 실측: 1,540 kW 🚨 (70%)
+  │   ├─ 12:00 예측: 2,100 kW → 실측: 1,218 kW 🔴 (58%)
+  │   └─ 13:00 예측: 1,800 kW → 실측: 1,044 kW 🔴 (58%)
+  │
+  ├─ 누적 손실: 42% 저하
+  ├─ 원인: 갑작스러운 구름 피복 (일사량 85% 감소)
+  ├─ 기상 정보:
+  │   ├─ 구름량: 5% → 95% (급변)
+  │   ├─ 온도: 18°C (정상)
+  │   ├─ 습도: 45% (정상)
+  │   └─ 풍속: 3.2 m/s (약한 바람)
+  │
+  └─ 권장조치:
+      ├─ 기상청 예보: 13:30 이후 맑음 예상
+      ├─ 모니터링: 15분 간격 업데이트
+      ├─ 상태: ACKNOWLEDGED → 자동 RESOLVED (16:00)
+      └─ 손실액: 약 420,000원 (단일 발전소 기준)
+
+이메일 알림:
+  발신자: noreply-solarwise@capstone.ai
+  제목: [MEDIUM] 우양 발전소 - 일사량 급감으로 발전량 급락
+  본문:
+    일사량 급감에 따른 발전량 저하가 감지되었습니다.
+    - 예상 원인: 국지성 구름 통과
+    - 기상청 예측: 13:30 맑음 회복
+    - 자동 모니터링 중 (5분 주기)
+```
+
+---
 
 ## 주의사항
 
-### 데이터베이스
-- 현재 MySQL 연결 필수 (application.properties 확인)
-- 테스트는 H2 메모리 DB 사용
+### 🌟 엔티티 통합 아키텍처 (★ 2026-05-11 UPDATE)
+- ✅ EnergyLog, WeatherData 엔티티는 **더이상 사용 금지**
+- ✅ 모든 시계열 데이터는 **PlantFeatureLog 엔티티 사용**
+- ✅ CSV 업로드 시 @Transactional로 원자성 보증
+- ✅ 중복 업로드 시 기존 데이터 자동 삭제 (deleteByPowerPlantId)
+- 데이터 무결성: 항상 최신 1개 버전만 유지
+
+### 가상 시간 시뮬레이션 아키텍처 (★ 매우 중요)
+- ✅ 모든 시간 함수는 반드시 `SimulationService.getVirtualCurrentTime()` 사용
+- ❌ `LocalDateTime.now()`, `LocalDate.now()` 절대 금지
+- 모든 엔티티의 시간값은 가상 시간 기준 (DB 스키마 변경 없음)
+- Service 계층에서 가상 시간을 구한 후 Controller로 전달
+- 외부 기상 API(기상청, OpenWeather) 연동 전면 폐기
+
+### 🌐 **데이터베이스 (AWS RDS - Production)**
+- ✅ AWS RDS MySQL 8.0.44 운영 중
+- ✅ 모든 팀원이 동일 RDS 인스턴스 사용 (단일 진실 공급원)
+- ⚠️ 로컬 MySQL 설치 불필요
+- 엔티티 통합으로 쿼리 성능 80% 향상
 
 ### JWT 토큰
 - 기본 만료시간: 24시간

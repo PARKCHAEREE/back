@@ -2,13 +2,11 @@ package com.solarwise.capstonebackend.service;
 
 import com.opencsv.bean.CsvToBeanBuilder;
 import com.solarwise.capstonebackend.dto.AdvisorDataCsvDto;
-import com.solarwise.capstonebackend.entity.EnergyLog;
+import com.solarwise.capstonebackend.entity.PlantFeatureLog;
 import com.solarwise.capstonebackend.entity.PowerPlant;
-import com.solarwise.capstonebackend.entity.WeatherData;
 import com.solarwise.capstonebackend.exception.BusinessException;
-import com.solarwise.capstonebackend.repository.EnergyLogRepository;
+import com.solarwise.capstonebackend.repository.PlantFeatureLogRepository;
 import com.solarwise.capstonebackend.repository.PowerPlantRepository;
-import com.solarwise.capstonebackend.repository.WeatherDataRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -27,20 +25,20 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 기상 데이터 임포트 서비스
- * - 우양 제공 CSV 파일 파싱 및 EnergyLog 엔티티로 변환하여 DB 적재
+ * CSV 데이터 임포트 서비스
+ * - 우양 제공 CSV 파일을 파싱하여 PlantFeatureLog 엔티티로 변환하여 DB 적재
+ * - 원본 CSV의 7개 파생 변수(TIME, ACTUAL, PREDICTION, TEMP, HUMI, CLOU, IRRADIANCE)를 보존
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class WeatherDataImportService {
 
-    private final EnergyLogRepository energyLogRepository;
+    private final PlantFeatureLogRepository plantFeatureLogRepository;
     private final PowerPlantRepository powerPlantRepository;
-    private final WeatherDataRepository weatherDataRepository;
 
     /**
-     * 우양 제공 태양광/기상 데이터 CSV를 파싱하여 EnergyLog와 WeatherData로 적재합니다.
+     * 우양 제공 태양광/기상 데이터 CSV를 파싱하여 PlantFeatureLog로 적재합니다.
      *
      * @param powerPlantId 데이터를 적재할 발전소의 ID
      * @param file 업로드된 CSV 파일
@@ -65,8 +63,8 @@ public class WeatherDataImportService {
             throw new BusinessException("CSV 파일 파싱 중 오류가 발생했습니다: " + e.getMessage(), HttpStatus.BAD_REQUEST);
         }
 
-        List<EnergyLog> energyLogList = new ArrayList<>();
-        List<WeatherData> weatherDataList = new ArrayList<>();
+        // 🔑 PlantFeatureLog 리스트만 사용 (EnergyLog, WeatherData 제거)
+        List<PlantFeatureLog> featureLogList = new ArrayList<>();
         int successCount = 0;
         int failureCount = 0;
 
@@ -77,35 +75,27 @@ public class WeatherDataImportService {
                 String rawTime = csvDto.getTime().trim();
                 LocalDateTime timestamp = LocalDateTime.parse(rawTime, formatter);
 
-                // 캡스톤 시연용 가짜 이상 탐지 조작: 10월 2일 오후 1시(13시) 이후 실제 발전량을 40%로 깎음
-                Double powerKw = csvDto.getActual() != null ? csvDto.getActual() : 0.0;
+                // 캡스톤 시연용 가짜 이상 탐지 조작: 2026-03-15 13:00 이후 실제 발전량을 40%로 깎음
+                Double actualValue = csvDto.getActual() != null ? csvDto.getActual() : 0.0;
                 if (enableDemoCheat && timestamp.isAfter(LocalDateTime.of(2026, 3, 15, 13, 0))) {
-                    powerKw *= 0.4; // 13시 이후부터 이상 발생 시작!
+                    actualValue *= 0.4; // 13시 이후부터 이상 발생 시작!
+                    log.debug("데모 조작 적용: {} → {} (40%로 감소)", csvDto.getActual(), actualValue);
                 }
 
-                // EnergyLog 엔티티 빌드
-                EnergyLog energyLog = EnergyLog.builder()
-                        .powerPlant(powerPlant)
-                        .powerKw(powerKw)
-                        .temperature(csvDto.getTemp() != null ? csvDto.getTemp() : 0.0)
-                        .humidity(csvDto.getHumi() != null ? csvDto.getHumi() : 0.0)
-                        .irradiance(csvDto.getIrradiance() != null ? csvDto.getIrradiance() : 0.0)
-                        .timestamp(timestamp)
+                // PlantFeatureLog 엔티티 빌드 (CSV의 7개 컬럼 매핑)
+                PlantFeatureLog featureLog = PlantFeatureLog.builder()
+                        .powerPlantId(powerPlantId)
+                        .measuredAt(timestamp)                                      // TIME
+                        .actual(actualValue)                                        // ACTUAL (조작 여부 포함)
+                        .prediction(csvDto.getPrediction() != null ? csvDto.getPrediction() : 0.0)  // PREDICTION
+                        .temp(csvDto.getTemp() != null ? csvDto.getTemp() : 0.0)   // TEMP
+                        .humi(csvDto.getHumi() != null ? csvDto.getHumi() : 0.0)   // HUMI
+                        .clou(csvDto.getClou() != null ? csvDto.getClou() : 0.0)   // CLOU
+                        .irradiance(csvDto.getIrradiance() != null ? csvDto.getIrradiance() : 0.0)  // IRRADIANCE
+                        .wisp(0.0)                                                  // WISP (CSV에 없음, 풍속 기본값 0.0)
                         .build();
 
-                energyLogList.add(energyLog);
-
-                // WeatherData 엔티티 빌드
-                WeatherData weatherData = WeatherData.builder()
-                        .powerPlant(powerPlant)
-                        .temperature(csvDto.getTemp() != null ? csvDto.getTemp() : 0.0)
-                        .humidity(csvDto.getHumi() != null ? csvDto.getHumi() : 0.0)
-                        .irradiance(csvDto.getIrradiance() != null ? csvDto.getIrradiance() : 0.0)
-                        .cloudCover(csvDto.getClou() != null ? csvDto.getClou() / 100.0 : 0.0)
-                        .timestamp(timestamp)
-                        .build();
-
-                weatherDataList.add(weatherData);
+                featureLogList.add(featureLog);
                 successCount++;
 
             } catch (DateTimeParseException e) {
@@ -121,10 +111,14 @@ public class WeatherDataImportService {
         }
 
         // 성공한 데이터만 DB에 적재
-        if (!energyLogList.isEmpty()) {
-            energyLogRepository.saveAll(energyLogList);
-            weatherDataRepository.saveAll(weatherDataList);
-            log.info("데이터 적재 완료! 발전소 ID: {}, EnergyLog: {}건, WeatherData: {}건, 실패: {}건", powerPlantId, energyLogList.size(), weatherDataList.size(), failureCount);
+        if (!featureLogList.isEmpty()) {
+            // 🔑 중복 방지: 해당 발전소의 기존 피처 로그 데이터 모두 삭제
+            plantFeatureLogRepository.deleteByPowerPlantId(powerPlantId);
+            log.info("기존 피처 로그 삭제 완료 - 발전소 ID: {}", powerPlantId);
+
+            // 새로운 CSV 데이터를 PlantFeatureLog로 저장
+            plantFeatureLogRepository.saveAll(featureLogList);
+            log.info("PlantFeatureLog 적재 완료! 발전소 ID: {}, 저장: {}건, 실패: {}건", powerPlantId, featureLogList.size(), failureCount);
         } else {
             log.warn("적재할 유효한 데이터가 없습니다. 발전소 ID: {}", powerPlantId);
         }

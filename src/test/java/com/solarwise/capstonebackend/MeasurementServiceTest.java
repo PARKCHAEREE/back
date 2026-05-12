@@ -3,14 +3,15 @@ package com.solarwise.capstonebackend;
 import com.solarwise.capstonebackend.dto.DashboardSummaryDto;
 import com.solarwise.capstonebackend.dto.MeasurementCsvUploadResult;
 import com.solarwise.capstonebackend.dto.MeasurementSeriesDto;
-import com.solarwise.capstonebackend.entity.EnergyLog;
+import com.solarwise.capstonebackend.entity.PlantFeatureLog;
 import com.solarwise.capstonebackend.entity.PowerPlant;
 import com.solarwise.capstonebackend.entity.User;
 import com.solarwise.capstonebackend.exception.ResourceNotFoundException;
 import com.solarwise.capstonebackend.repository.AnomalyRepository;
-import com.solarwise.capstonebackend.repository.EnergyLogRepository;
+import com.solarwise.capstonebackend.repository.PlantFeatureLogRepository;
 import com.solarwise.capstonebackend.repository.PowerPlantRepository;
 import com.solarwise.capstonebackend.service.MeasurementService;
+import com.solarwise.capstonebackend.service.SimulationService;
 import com.solarwise.capstonebackend.util.CsvParsingUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -36,7 +37,7 @@ import static org.mockito.Mockito.when;
 class MeasurementServiceTest {
 
     @Mock
-    private EnergyLogRepository energyLogRepository;
+    private PlantFeatureLogRepository plantFeatureLogRepository;
 
     @Mock
     private PowerPlantRepository powerPlantRepository;
@@ -46,6 +47,9 @@ class MeasurementServiceTest {
 
     @Mock
     private CsvParsingUtil csvParsingUtil;
+
+    @Mock
+    private SimulationService simulationService;
 
     @InjectMocks
     private MeasurementService measurementService;
@@ -58,13 +62,13 @@ class MeasurementServiceTest {
                 .id(10L)
                 .email("owner@solarwise.com")
                 .password("encoded-password")
-                .name("담당자")
+                .name("owner")
                 .build();
 
         plant = PowerPlant.builder()
                 .id(1L)
-                .name("서천 발전소")
-                .location("충남 서천군")
+                .name("seocheon-plant")
+                .location("seocheon")
                 .capacity(10850.125)
                 .panelCount(11)
                 .user(owner)
@@ -78,28 +82,26 @@ class MeasurementServiceTest {
         );
 
         List<String[]> csvRows = List.of(
-                new String[]{"V_SITE_ID", "TIME", "D_PERIOD_GEN_KWH", "D_TEMP", "D_HUMIDITY"},
-                new String[]{"KR10025001", "2026042600", "10.5", "18.0", "70.0"},
-                new String[]{"KR10025001", "2026042601", "11.0", "", "71.0"},
-                new String[]{"KR10025001", "invalid", "12.0", "20.0", "72.0"},
-                new String[]{"KR10025001", "2026042600", "10.5", "18.0", "70.0"},
-                new String[]{"KR10025001", "2026042602", "13.0", "21.0", "73.0"}
+                new String[]{"TIME", "D_PERIOD_GEN_KWH", "D_TEMP", "D_HUMIDITY"},
+                new String[]{"2026042600", "10.5", "18.0", "70.0"},
+                new String[]{"2026042601", "11.0", "", "71.0"},
+                new String[]{"invalid", "12.0", "20.0", "72.0"},
+                new String[]{"2026042600", "10.5", "18.0", "70.0"},
+                new String[]{"2026042602", "13.0", "21.0", "73.0"}
         );
 
         when(powerPlantRepository.findByIdAndUserId(1L, 10L)).thenReturn(Optional.of(plant));
         when(csvParsingUtil.parseCsv(file)).thenReturn(csvRows);
-        when(energyLogRepository.findByPowerPlantIdAndTimestampBetweenOrderByTimestampAsc(
+        when(plantFeatureLogRepository.findByPowerPlantIdAndMeasuredAtBetweenOrderByMeasuredAtAsc(
                 eq(1L), eq(LocalDateTime.of(2026, 4, 26, 0, 0)), eq(LocalDateTime.of(2026, 4, 26, 2, 0))))
-                .thenReturn(List.of(EnergyLog.builder()
-                        .powerPlant(plant)
-                        .timestamp(LocalDateTime.of(2026, 4, 26, 2, 0))
-                        .powerKw(13.0)
-                        .energyKwh(13.0)
-                        .temperature(21.0)
-                        .irradiance(0.0)
-                        .humidity(73.0)
+                .thenReturn(List.of(PlantFeatureLog.builder()
+                        .powerPlantId(1L)
+                        .measuredAt(LocalDateTime.of(2026, 4, 26, 2, 0))
+                        .actual(13.0)
+                        .temp(21.0)
+                        .humi(73.0)
                         .build()));
-        when(energyLogRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(plantFeatureLogRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         MeasurementCsvUploadResult result = measurementService.uploadMeasurementCsv(1L, 10L, file);
 
@@ -108,21 +110,18 @@ class MeasurementServiceTest {
         assertThat(result.getSavedRows()).isEqualTo(2);
         assertThat(result.getDuplicateRows()).isEqualTo(2);
         assertThat(result.getSkippedRows()).isEqualTo(1);
-        assertThat(result.getFirstTimestamp()).isEqualTo(LocalDateTime.of(2026, 4, 26, 0, 0));
-        assertThat(result.getLastTimestamp()).isEqualTo(LocalDateTime.of(2026, 4, 26, 2, 0));
 
         @SuppressWarnings("unchecked")
-        ArgumentCaptor<List<EnergyLog>> captor = ArgumentCaptor.forClass((Class<List<EnergyLog>>) (Class<?>) List.class);
-        verify(energyLogRepository).saveAll(captor.capture());
-        List<EnergyLog> savedLogs = captor.getValue();
+        ArgumentCaptor<List<PlantFeatureLog>> captor = ArgumentCaptor.forClass((Class<List<PlantFeatureLog>>) (Class<?>) List.class);
+        verify(plantFeatureLogRepository).saveAll(captor.capture());
+        List<PlantFeatureLog> savedLogs = captor.getValue();
 
         assertThat(savedLogs).hasSize(2);
-        assertThat(savedLogs.getFirst().getTimestamp()).isEqualTo(LocalDateTime.of(2026, 4, 26, 0, 0));
-        assertThat(savedLogs.getFirst().getPowerKw()).isEqualTo(10.5);
-        assertThat(savedLogs.getFirst().getEnergyKwh()).isEqualTo(10.5);
-        assertThat(savedLogs.get(1).getTimestamp()).isEqualTo(LocalDateTime.of(2026, 4, 26, 1, 0));
-        assertThat(savedLogs.get(1).getTemperature()).isEqualTo(18.0); // 앞뒤 보간: (18.0 + 18.0) / 2 = 18.0
-        assertThat(savedLogs.get(1).getHumidity()).isEqualTo(71.0);
+        assertThat(savedLogs.get(0).getMeasuredAt()).isEqualTo(LocalDateTime.of(2026, 4, 26, 0, 0));
+        assertThat(savedLogs.get(0).getActual()).isEqualTo(10.5);
+        assertThat(savedLogs.get(1).getMeasuredAt()).isEqualTo(LocalDateTime.of(2026, 4, 26, 1, 0));
+        assertThat(savedLogs.get(1).getTemp()).isEqualTo(18.0);
+        assertThat(savedLogs.get(1).getHumi()).isEqualTo(71.0);
     }
 
     @Test
@@ -139,30 +138,25 @@ class MeasurementServiceTest {
     }
 
     @Test
-    void getDashboardSummary_usesEnergyKwhForTodayGeneration() {
-        EnergyLog latestLog = EnergyLog.builder()
-                .powerPlant(plant)
-                .timestamp(LocalDateTime.of(2026, 5, 2, 14, 0))
-                .powerKw(20.0)
-                .energyKwh(20.0)
-                .temperature(24.0)
-                .irradiance(0.0)
-                .humidity(55.0)
+    void getDashboardSummary_usesActualForTodayGeneration() {
+        PlantFeatureLog latestLog = PlantFeatureLog.builder()
+                .powerPlantId(1L)
+                .measuredAt(LocalDateTime.of(2026, 5, 2, 14, 0))
+                .actual(20.0)
+                .temp(24.0)
+                .humi(55.0)
                 .build();
 
         when(powerPlantRepository.findByIdAndUserId(1L, 10L)).thenReturn(Optional.of(plant));
-        when(energyLogRepository.findTopByPowerPlantIdOrderByTimestampDesc(1L)).thenReturn(Optional.of(latestLog));
-        when(energyLogRepository.findByPowerPlantIdAndTimestampBetweenOrderByTimestampAsc(eq(1L), any(), any()))
+        when(plantFeatureLogRepository.findTopByPowerPlantIdOrderByMeasuredAtDesc(1L)).thenReturn(latestLog);
+        when(simulationService.getVirtualCurrentTime()).thenReturn(LocalDateTime.of(2026, 5, 2, 14, 30));
+        when(plantFeatureLogRepository.findByPowerPlantIdAndMeasuredAtBetweenOrderByMeasuredAtAsc(eq(1L), any(), any()))
                 .thenReturn(List.of(
                         latestLog,
-                        EnergyLog.builder()
-                                .powerPlant(plant)
-                                .timestamp(LocalDateTime.of(2026, 5, 2, 13, 0))
-                                .powerKw(15.0)
-                                .energyKwh(15.0)
-                                .temperature(23.0)
-                                .irradiance(0.0)
-                                .humidity(58.0)
+                        PlantFeatureLog.builder()
+                                .powerPlantId(1L)
+                                .measuredAt(LocalDateTime.of(2026, 5, 2, 13, 0))
+                                .actual(15.0)
                                 .build()
                 ));
         when(anomalyRepository.findByPowerPlantIdOrderByDetectedAtDesc(1L)).thenReturn(List.of());
@@ -175,28 +169,26 @@ class MeasurementServiceTest {
     }
 
     @Test
-    void getMeasurementSeries_returnsEnergyKwhTogether() {
+    void getMeasurementSeries_returnsActualAndWeatherFields() {
         when(powerPlantRepository.findByIdAndUserId(1L, 10L)).thenReturn(Optional.of(plant));
-        when(energyLogRepository.findByPowerPlantIdAndTimestampBetweenOrderByTimestampAsc(
+        when(plantFeatureLogRepository.findByPowerPlantIdAndMeasuredAtBetweenOrderByMeasuredAtAsc(
                 eq(1L), eq(LocalDateTime.of(2026, 5, 1, 0, 0)), eq(LocalDateTime.of(2026, 5, 1, 2, 0))))
                 .thenReturn(List.of(
-                        EnergyLog.builder()
-                                .powerPlant(plant)
-                                .timestamp(LocalDateTime.of(2026, 5, 1, 0, 0))
-                                .powerKw(8.0)
-                                .energyKwh(8.0)
-                                .temperature(19.0)
+                        PlantFeatureLog.builder()
+                                .powerPlantId(1L)
+                                .measuredAt(LocalDateTime.of(2026, 5, 1, 0, 0))
+                                .actual(8.0)
+                                .temp(19.0)
                                 .irradiance(0.0)
-                                .humidity(80.0)
+                                .humi(80.0)
                                 .build(),
-                        EnergyLog.builder()
-                                .powerPlant(plant)
-                                .timestamp(LocalDateTime.of(2026, 5, 1, 1, 0))
-                                .powerKw(12.5)
-                                .energyKwh(12.5)
-                                .temperature(20.0)
+                        PlantFeatureLog.builder()
+                                .powerPlantId(1L)
+                                .measuredAt(LocalDateTime.of(2026, 5, 1, 1, 0))
+                                .actual(12.5)
+                                .temp(20.0)
                                 .irradiance(0.0)
-                                .humidity(78.0)
+                                .humi(78.0)
                                 .build()
                 ));
 
@@ -212,7 +204,3 @@ class MeasurementServiceTest {
         assertThat(result.getSeries().get(1).getPowerKw()).isEqualTo(12.5);
     }
 }
-
-
-
-

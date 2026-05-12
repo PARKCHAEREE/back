@@ -5,11 +5,11 @@ import com.solarwise.capstonebackend.dto.MeasurementCsvUploadResult;
 import com.solarwise.capstonebackend.dto.MeasurementDto;
 import com.solarwise.capstonebackend.dto.MeasurementSeriesDto;
 import com.solarwise.capstonebackend.entity.Anomaly;
-import com.solarwise.capstonebackend.entity.EnergyLog;
+import com.solarwise.capstonebackend.entity.PlantFeatureLog;
 import com.solarwise.capstonebackend.entity.PowerPlant;
 import com.solarwise.capstonebackend.exception.ResourceNotFoundException;
 import com.solarwise.capstonebackend.repository.AnomalyRepository;
-import com.solarwise.capstonebackend.repository.EnergyLogRepository;
+import com.solarwise.capstonebackend.repository.PlantFeatureLogRepository;
 import com.solarwise.capstonebackend.repository.PowerPlantRepository;
 import com.solarwise.capstonebackend.util.CsvParsingUtil;
 import lombok.RequiredArgsConstructor;
@@ -42,10 +42,11 @@ public class MeasurementService {
 
     private static final DateTimeFormatter MEASUREMENT_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMddHH");
 
-    private final EnergyLogRepository energyLogRepository;
+    private final PlantFeatureLogRepository plantFeatureLogRepository;
     private final PowerPlantRepository powerPlantRepository;
     private final AnomalyRepository anomalyRepository;
     private final CsvParsingUtil csvParsingUtil;
+    private final SimulationService simulationService;
 
     /**
      * 실측 CSV 업로드
@@ -85,27 +86,28 @@ public class MeasurementService {
         LocalDateTime firstTimestamp = interpolatedRows.get(0).timestamp();
         LocalDateTime lastTimestamp = interpolatedRows.get(interpolatedRows.size() - 1).timestamp();
 
-        Set<LocalDateTime> existingTimestamps = energyLogRepository
-                .findByPowerPlantIdAndTimestampBetweenOrderByTimestampAsc(plantId, firstTimestamp, lastTimestamp)
+        Set<LocalDateTime> existingTimestamps = plantFeatureLogRepository
+                .findByPowerPlantIdAndMeasuredAtBetweenOrderByMeasuredAtAsc(plantId, firstTimestamp, lastTimestamp)
                 .stream()
-                .map(EnergyLog::getTimestamp)
+                .map(PlantFeatureLog::getMeasuredAt)
                 .collect(Collectors.toCollection(HashSet::new));
 
-        List<EnergyLog> logsToSave = interpolatedRows.stream()
+        List<PlantFeatureLog> logsToSave = interpolatedRows.stream()
                 .filter(parsed -> existingTimestamps.add(parsed.timestamp()))
-                .map(parsed -> EnergyLog.builder()
-                        .powerPlant(plant)
-                        .timestamp(parsed.timestamp())
-                        .powerKw(parsed.energyKwh())
-                        .energyKwh(parsed.energyKwh())
-                        .temperature(parsed.temperature())
-                        // irradiance: 현재 CSV에 없음 — 기상청 API 연동 후 채울 예정
-                        .irradiance(null)
-                        .humidity(parsed.humidity())
+                .map(parsed -> PlantFeatureLog.builder()
+                        .powerPlantId(plant.getId())
+                        .measuredAt(parsed.timestamp())
+                        .actual(parsed.energyKwh())
+                        .prediction(0.0) // CSV에 예측값 없음
+                        .temp(parsed.temperature())
+                        .humi(parsed.humidity())
+                        .clou(0.0) // CSV에 운량 없음
+                        .irradiance(null) // CSV에 일사량 없음
+                        .wisp(0.0) // 풍속 기본값
                         .build())
                 .toList();
 
-        energyLogRepository.saveAll(logsToSave);
+        plantFeatureLogRepository.saveAll(logsToSave);
 
         int duplicateRows = interpolatedRows.size() - logsToSave.size();
         log.info("실측 CSV 업로드 완료: plantId={}, total={}, saved={}, duplicate={}, skipped={}",
@@ -132,19 +134,19 @@ public class MeasurementService {
                 .orElseThrow(() -> new ResourceNotFoundException("발전소를 찾을 수 없습니다."));
 
         // 현재 발전량 (가장 최근 데이터)
-        EnergyLog latestLog = energyLogRepository.findTopByPowerPlantIdOrderByTimestampDesc(plant.getId())
-                .orElse(null);
+        PlantFeatureLog latestLog = plantFeatureLogRepository.findTopByPowerPlantIdOrderByMeasuredAtDesc(plant.getId());
 
-        Double currentPowerKw = latestLog != null ? latestLog.getPowerKw() : 0.0;
+        Double currentPowerKw = latestLog != null ? latestLog.getActual() : 0.0;
 
-        // 금일 발전량 (오늘 00:00 ~ 23:59)
-        LocalDateTime todayStart = LocalDateTime.of(LocalDate.now(), LocalTime.MIN);
-        LocalDateTime todayEnd = LocalDateTime.of(LocalDate.now(), LocalTime.MAX);
-        List<EnergyLog> todayLogs = energyLogRepository
-                .findByPowerPlantIdAndTimestampBetweenOrderByTimestampAsc(plant.getId(), todayStart, todayEnd);
+        // ✅ FIXED: 가상 시간 기준으로 "금일" 범위 설정
+        LocalDateTime virtualNow = simulationService.getVirtualCurrentTime();
+        LocalDateTime todayStart = LocalDateTime.of(virtualNow.toLocalDate(), LocalTime.MIN);
+        LocalDateTime todayEnd = LocalDateTime.of(virtualNow.toLocalDate(), LocalTime.MAX);
+        List<PlantFeatureLog> todayLogs = plantFeatureLogRepository
+                .findByPowerPlantIdAndMeasuredAtBetweenOrderByMeasuredAtAsc(plant.getId(), todayStart, todayEnd);
 
         Double todayGenerationKwh = todayLogs.stream()
-                .mapToDouble(log -> log.getEnergyKwh() != null ? log.getEnergyKwh() : log.getPowerKw() / 60)
+                .mapToDouble(log -> log.getActual() != null ? log.getActual() : 0.0)
                 .sum();
 
         // 효율 (향후 확장)
@@ -169,11 +171,12 @@ public class MeasurementService {
                     .build();
         }
 
+        // ✅ FIXED: lastUpdatedAt도 가상 시간 기반 설정
         return DashboardSummaryDto.builder()
                 .currentPowerKw(currentPowerKw)
                 .todayGenerationKwh(todayGenerationKwh)
                 .efficiencyPercent(efficiencyPercent)
-                .lastUpdatedAt(latestLog != null ? latestLog.getTimestamp() : LocalDateTime.now())
+                .lastUpdatedAt(latestLog != null ? latestLog.getMeasuredAt() : virtualNow)
                 .latestAnomaly(anomalyInfo)
                 .build();
     }
@@ -186,17 +189,17 @@ public class MeasurementService {
         PowerPlant plant = powerPlantRepository.findByIdAndUserId(plantId, userId)
                 .orElseThrow(() -> new ResourceNotFoundException("발전소를 찾을 수 없습니다."));
 
-        List<EnergyLog> measurements = energyLogRepository
-                .findByPowerPlantIdAndTimestampBetweenOrderByTimestampAsc(plant.getId(), from, to);
+        List<PlantFeatureLog> measurements = plantFeatureLogRepository
+                .findByPowerPlantIdAndMeasuredAtBetweenOrderByMeasuredAtAsc(plant.getId(), from, to);
 
         List<MeasurementDto> series = measurements.stream()
                 .map(log -> MeasurementDto.builder()
-                        .measuredAt(log.getTimestamp())
-                        .powerKw(log.getPowerKw())
-                        .energyKwh(log.getEnergyKwh())
-                        .temperature(log.getTemperature())
+                        .measuredAt(log.getMeasuredAt())
+                        .powerKw(log.getActual())
+                        .energyKwh(log.getActual())
+                        .temperature(log.getTemp())
                         .irradiance(log.getIrradiance())
-                        .humidity(log.getHumidity())
+                        .humidity(log.getHumi())
                         .build())
                 .collect(Collectors.toList());
 
