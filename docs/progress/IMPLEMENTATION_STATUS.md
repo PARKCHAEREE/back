@@ -106,6 +106,8 @@
 ### ✅ 현재 엔티티 (2026-05-11 UPDATE)
 - `User` - 사용자
 - `PowerPlant` - 발전소
+  - 기존 필드명 변경: capacity → capacityKw
+  - 신규 필드 추가: location(위치), installYear(설치연도), panelCount(패널 수)
 - `PlantFeatureLog` - ✨ **통합 테이블** (실제 측정 + 기상 + 자문가 피처 데이터)
   - timestamp, actualPowerKw, temperature, humidity, cloudCover, irradiance, predictedPowerKw
   - **이점**: 3개 테이블 → 1개, 성능 80% 향상, 저장소 50% 절감
@@ -337,18 +339,21 @@ src/main/java/com/solarwise/capstonebackend/
 ```json
 요청:
 {
-  "name": "우양 태양광 발전소 2호기",
-  "capacity": 15.0,
-  "latitude": 37.123,
-  "longitude": 127.456,
-  "inverterModel": "SUNNY-2500",
-  "sensorSerialNumber": "SENSE-2026-001"
+  "name": "전북 익산 1호 발전소",
+  "location": "전북특별자치도 익산시",
+  "capacityKw": 120.5,
+  "installYear": 2022,
+  "panelCount": 320,
+  "latitude": 35.9483,
+  "longitude": 126.9578,
+  "inverterModel": "INV-3000",
+  "sensorSerialNumber": "SNSR-2026-0001"
 }
 
 응답:
 {
   "success": true,
-  "data": { "id": 2, "name": "...", "capacity": 15.0, ... },
+  "data": { "plantId": 5, "name": "...", "capacityKw": 120.5, "location": "전북특별자치도 익산시", ... },
   "message": "발전소 등록 성공"
 }
 ```
@@ -356,7 +361,7 @@ src/main/java/com/solarwise/capstonebackend/
 #### **2️⃣ 발전소 정보 수정 API (PUT /api/v1/plants/{plantId})**
 ```
 권한: 발전소 소유자만 수정 가능
-필드: name, capacity, latitude, longitude, inverterModel, sensorSerialNumber
+필드: name, capacityKw, location, installYear, panelCount, latitude, longitude, inverterModel, sensorSerialNumber
 ```
 
 #### **3️⃣ 이상 상태 변경 API (PATCH .../status)** ✅
