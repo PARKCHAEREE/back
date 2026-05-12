@@ -10,6 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
@@ -55,10 +56,20 @@ public class AuthController {
     @PostMapping("/logout")
     @PreAuthorize("isAuthenticated()")
     @Operation(summary = "로그아웃", description = "현재 세션 종료")
-    public ResponseEntity<ApiResponse<Void>> logout() {
-        log.info("로그아웃 요청");
+    public ResponseEntity<ApiResponse<Void>> logout(Authentication authentication) {
+        Long userId = parseUserId(authentication);
+
+        log.info("로그아웃 요청: userId={}", userId);
+        authService.logout(userId);
         SecurityContextHolder.clearContext();
         return ResponseEntity.ok(ApiResponse.success("로그아웃되었습니다."));
+    }
+
+    private Long parseUserId(Authentication authentication) {
+        if (authentication == null || authentication.getPrincipal() == null) {
+            throw new IllegalStateException("인증 정보가 없습니다.");
+        }
+        return Long.parseLong(authentication.getPrincipal().toString());
     }
 
 }

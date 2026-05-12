@@ -70,6 +70,11 @@ public class AuthService {
             throw new BusinessException("비활성화된 사용자입니다.");
         }
 
+        LocalDateTime virtualNow = simulationService.getVirtualCurrentTime();
+        user.setLastLoginAt(virtualNow);
+        user.setUpdatedAt(virtualNow);
+        userRepository.save(user);
+
         String accessToken = jwtUtil.generateToken(user.getId().toString());
 
         log.info("사용자 로그인: userId={}, email={}", user.getId(), user.getEmail());
@@ -79,6 +84,19 @@ public class AuthService {
                 .refreshToken(null) // TODO: 리프레시 토큰 구현
                 .user(entityToUserResponse(user))
                 .build();
+    }
+
+    /**
+     * 사용자 로그아웃 시각 기록
+     */
+    public void logout(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException("사용자를 찾을 수 없습니다."));
+
+        LocalDateTime virtualNow = simulationService.getVirtualCurrentTime();
+        user.setLastLogoutAt(virtualNow);
+        user.setUpdatedAt(virtualNow);
+        userRepository.save(user);
     }
 
     /**
