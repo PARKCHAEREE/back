@@ -65,6 +65,7 @@ public class AiIntegrationService {
     private final CsvParsingUtil csvParsingUtil;
     private final VisionAnalysisRepository visionAnalysisRepository;
     private final SimulationService simulationService;
+    private final NotificationService notificationService;
 
     @Value("${ai.server.base-url}")
     private String aiServerBaseUrl;
@@ -556,8 +557,12 @@ public class AiIntegrationService {
                 .detectedAt(simulationService.getVirtualCurrentTime())
                 .build();
 
-        anomalyRepository.save(anomaly);
+        Anomaly savedAnomaly = anomalyRepository.save(anomaly);
         log.info("이상 탐지 결과 DB 저장 완료: 발전소 ID={}, 심각도={}", powerPlant.getId(), response.getSeverity());
+
+        // Lazy Loading 에러 방지: 이메일을 미리 추출한 후 전달
+        String ownerEmail = powerPlant.getUser().getEmail();
+        notificationService.sendAnomalyAlert(savedAnomaly, ownerEmail);
     }
 
     /**
@@ -584,11 +589,11 @@ public class AiIntegrationService {
                 .updatedAt(virtualNow)
                 .build();
 
-        anomalyRepository.save(anomaly);
+        Anomaly savedAnomaly = anomalyRepository.save(anomaly);
 
         // VisionAnalysis 엔티티 저장
         VisionAnalysis visionAnalysis = VisionAnalysis.builder()
-                .anomaly(anomaly)
+                .anomaly(savedAnomaly)
                 .imageUrl(null) // TODO: 이미지 URL 저장 로직 추가
                 .analysisResult(String.format("결함 유형: %s, 신뢰도: %.2f%%, 심각도: %s",
                         response.getDefectType(), response.getConfidence() * 100, response.getSeverity()))
@@ -599,6 +604,10 @@ public class AiIntegrationService {
 
         log.info("이미지 이상 탐지 결과 DB 저장 완료: 발전소 ID={}, 패널 ID={}, 심각도={}",
                 powerPlant.getId(), panelId, response.getSeverity());
+
+        // Lazy Loading 에러 방지: 이메일을 미리 추출한 후 전달
+        String ownerEmail = powerPlant.getUser().getEmail();
+        notificationService.sendAnomalyAlert(savedAnomaly, ownerEmail);
     }
 
     /**
