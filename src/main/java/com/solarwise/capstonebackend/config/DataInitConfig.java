@@ -29,10 +29,10 @@ public class DataInitConfig {
     public CommandLineRunner initData() {
         return args -> {
             LocalDateTime virtualNow = simulationService.getVirtualCurrentTime();
-            // 백엔드 담당자(이승윤) 로컬 개발 및 Swagger 확인용 관리자 계정 자동 생성
-            if (userRepository.findByEmail("admin@solarwise.com").isEmpty()) {
+            // 백엔드 로컬 개발 및 Swagger 확인용 관리자 계정 자동 생성
+            if (userRepository.findByEmail("sass090023@gmail.com").isEmpty()) {
                 User admin = User.builder()
-                        .email("admin@solarwise.com")
+                        .email("sass090023@gmail.com")
                         .password(passwordEncoder.encode("password123"))
                         .name("테스트관리자")
                         .role("MANAGER")
@@ -41,7 +41,7 @@ public class DataInitConfig {
                         .updatedAt(virtualNow)
                         .build();
                 userRepository.save(admin);
-                log.info("테스트 관리자 계정 자동 생성 완료 (admin@solarwise.com / password123)");
+                log.info("테스트 관리자 계정 자동 생성 완료 (sass090023@gmail.com / password123)");
 
                 /*
                  * 실제 발전소 정보 (자문가 제공 데이터 기준)

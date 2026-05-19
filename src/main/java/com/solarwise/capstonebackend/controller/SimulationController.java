@@ -1,6 +1,9 @@
 package com.solarwise.capstonebackend.controller;
 
 import com.solarwise.capstonebackend.dto.ApiResponse;
+import com.solarwise.capstonebackend.dto.PowerAnomalyTriggerRequest;
+import com.solarwise.capstonebackend.dto.AnomalyDto;
+import com.solarwise.capstonebackend.entity.Anomaly;
 import com.solarwise.capstonebackend.service.SimulationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -57,5 +60,45 @@ public class SimulationController {
     public ResponseEntity<ApiResponse<String>> triggerDroneError() {
         simulationService.triggerDroneError();
         return ResponseEntity.ok(ApiResponse.success("드론 에러 트리거 설정됨", "다음 스케줄 실행 시 파손 패널 이미지 분석이 수행됩니다."));
+    }
+
+    @Operation(summary = "시뮬레이션: 발전량 이상 트리거")
+    @PostMapping("/trigger-power-anomaly")
+    public ResponseEntity<ApiResponse<AnomalyDto>> triggerPowerAnomaly(@RequestBody PowerAnomalyTriggerRequest request) {
+        Anomaly anomaly = simulationService.triggerPowerAnomaly(request);
+
+        AnomalyDto dto = AnomalyDto.builder()
+                .eventId(anomaly.getId())
+                .type(anomaly.getType())
+                .severity(anomaly.getSeverity())
+                .detectedAt(anomaly.getDetectedAt())
+                .summary(anomaly.getSummary())
+                .status(anomaly.getStatus())
+                .cause(anomaly.getCause())
+                .recommendedAction(anomaly.getRecommendedAction())
+                .xaiExplanation(anomaly.getXaiExplanation())
+                .build();
+
+        return ResponseEntity.ok(ApiResponse.success(dto, "발전량 이상 시뮬레이션 트리거 생성됨"));
+    }
+
+    @Operation(summary = "시뮬레이션: 비전 이상 트리거")
+    @PostMapping("/trigger-vision-anomaly")
+    public ResponseEntity<ApiResponse<AnomalyDto>> triggerVisionAnomaly(@RequestBody com.solarwise.capstonebackend.dto.VisionAnomalyTriggerRequest request) {
+        Anomaly anomaly = simulationService.triggerVisionAnomaly(request);
+
+        AnomalyDto dto = AnomalyDto.builder()
+                .eventId(anomaly.getId())
+                .type(anomaly.getType())
+                .severity(anomaly.getSeverity())
+                .detectedAt(anomaly.getDetectedAt())
+                .summary(anomaly.getSummary())
+                .status(anomaly.getStatus())
+                .cause(anomaly.getCause())
+                .recommendedAction(anomaly.getRecommendedAction())
+                .xaiExplanation(anomaly.getXaiExplanation())
+                .build();
+
+        return ResponseEntity.ok(ApiResponse.success(dto, "비전 이상 시뮬레이션 트리거 생성됨"));
     }
 }

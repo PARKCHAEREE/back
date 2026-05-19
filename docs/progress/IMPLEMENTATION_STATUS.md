@@ -1,26 +1,40 @@
-# 백엔드 API 구현 현황 (2026-05-11)
+# 백엔드 API 구현 현황 (2026-05-18 UPDATE)
 
 ## 📊 핵심 진행도
-- **전체 진행률**: Phase 5 완료 (95%)
+- **전체 진행률**: Phase 5 완료 (98%) → P0 과제 100% 달성
 - **빌드 상태**: ✅ BUILD SUCCESSFUL (0 컴파일 오류)
 - **데이터 모델**: ✅ PlantFeatureLog 통합 (3개 테이블 → 1개 테이블)
 - **AI 연동**: ✅ 비동기 처리 완료 (CompletableFuture)
-- **가상 시간 아키텍처**: ✅ 100% 준수 (10개 파일 검수 완료)
+- **가상 시간 아키텍처**: ✅ 100% 준수 (모든 파일 검수 완료)
+- **알림 아키텍처**: ✅ Lazy Loading 에러 방지 완료 (트랜잭션 경계 최적화)
 
 ---
 
 ## 현재 진행 상황
 
-### ✅ Phase 1: 기본 인증 및 발전소 조회 (완료)
+### ✅ Phase 1: 기본 인증 및 발전소 CRUD (완료)
 - 공통 응답 래퍼 (`ApiResponse`, `ApiErrorResponse`) 추가
-- 인증 API 4종 구현
+- 인증 API 5종 구현 ✨ (5/12 업데이트)
   - `POST /api/v1/auth/signup` - 회원가입
-  - `POST /api/v1/auth/login` - 로그인
-  - `POST /api/v1/auth/logout` - 로그아웃
+  - `POST /api/v1/auth/login` - 로그인 (lastLoginAt 기록)
+  - `POST /api/v1/auth/logout` - 로그아웃 (lastLogoutAt 기록) ✨
   - `GET /api/v1/users/me` - 내 정보 조회
-- 발전소 조회 API 2종 구현
-  - `GET /api/v1/plants` - 발전소 목록
-  - `GET /api/v1/plants/{plantId}` - 발전소 상세
+- 발전소 CRUD API 5종 구현 ✨ (5/12 완료)
+  - `GET /api/v1/plants` - 발전소 목록 조회
+  - `GET /api/v1/plants/{plantId}` - 발전소 상세 조회
+  - `POST /api/v1/plants` - 발전소 등록 ✨
+  - `PUT /api/v1/plants/{plantId}` - 발전소 정보 수정 ✨
+  - `DELETE /api/v1/plants/{plantId}` - 발전소 삭제 (소프트 삭제) ✨
+- User 엔티티 필드 추가 ✨ (5/12 완료)
+  - `lastLoginAt` - 마지막 로그인 일시
+  - `lastLogoutAt` - 마지막 로그아웃 일시
+  - `createdAt` - 계정 생성 일시 (불변)
+- PowerPlant 엔티티 필드 추가 ✨ (5/12 완료)
+  - `location` - 위치
+  - `installYear` - 설치 연도
+  - `panelCount` - 패널 수
+  - `status` - 상태 (ACTIVE, INACTIVE)
+  - `active` - 소프트 삭제 플래그
 
 ### ✅ Phase 2: 대시보드 및 측정 데이터 (완료)
 - 대시보드 요약 API
@@ -49,7 +63,7 @@
   - `RESOLVED` 시 `resolvedAt` 자동 설정, 되돌릴 경우 초기화
   - 발전소 소유권 검증 포함
 
-### ✅ Phase 5: 이미지 분석 및 백그라운드 처리 (완료)
+### ✅ Phase 5: 이미지 분석, 시뮬레이션 및 알림 (완료)
 - ✅ AI 연동 로직 비동기 처리 (@Async, CompletableFuture)
   - 발전량 예측: `requestPredictionFromAi()`
   - XAI 설명: `requestXaiExplanation()`
@@ -57,16 +71,23 @@
 - ✅ `VisionAnalysis` 엔티티 생성 (이미지 분석 결과 및 XAI 신뢰도 저장)
 - ✅ **가상 시간 시뮬레이션 엔진 완성**
   - `SimulationService`: 인메모리 가상 시간 관리 (2026-03-15 13:00 시작)
-  - `SimulationController`: 시뮬레이션 제어 API 3종
+  - `SimulationController`: 시뮬레이션 제어 API 5종 ✨ (5/17 완료)
     - `GET /api/v1/simulation/time` - 현재 가상 시간 조회
     - `POST /api/v1/simulation/tick` - 가상 시간 1시간 진행
     - `POST /api/v1/simulation/trigger-drone-error` - 드론 오류 트리거 (시연용)
+    - `POST /api/v1/simulation/trigger-power-anomaly` - 발전량 이상 시뮬레이션 ✨
+    - `POST /api/v1/simulation/trigger-vision-anomaly` - 비전 이상 시뮬레이션 ✨
   - **핵심 원칙**: `LocalDateTime.now()` 전면 금지 → `SimulationService.getVirtualCurrentTime()` 사용
   - **DB 스키마 변경 없음**: 인메모리로만 시간 제어 (모든 엔티티의 시간은 가상 시간 기준)
 - ✅ 드론 비전 AI 시연 자동화
   - 백엔드 스케줄러가 주기적으로 AI 서버와 통신
   - `/trigger-drone-error` API 호출 시 의도적으로 파손된 이미지 전송
   - enableDemoCheat 파라미터로 시연용 anomaly 주입 (CSV 업로드 시)
+- ✅ **이메일 알림 시스템 구현** ✨ (5/15-18 완료)
+  - `NotificationService` - JavaMailSender 활용 비동기 이메일 발송
+  - HIGH 등급 이상만 자동 발송
+  - Lazy Loading 에러 방지 (트랜잭션 경계 최적화) ✨ (5/18 개선)
+  - 3개 서비스 통합: SimulationService, AiIntegrationService 등
 - 🔄 구현 필요:
   - `EnergyAggregationService` 시간별/일별 데이터 집계 배치 스케줄러
 
@@ -129,26 +150,18 @@
 ## 역할 분담
 
 ### 백엔드 API 영역 (이승윤)
-- ✅ 공통 응답 포맷 및 DTO Validation 적용
-- ✅ 인증 API 완료 (회원가입, 로그인, 로그아웃, 내 정보 조회)
-- ✅ 발전소 조회 API 완료 (목록 조회, 상세 조회) * (참고: '등록'은 아직 안 됨! 아래 Next Step으로 이동)
-- ✅ 측정 데이터 및 대시보드 요약 API 완료
-- ✅ 이상 탐지 상세 조회 및 상태 변경 로직 완료
-- ✅ RDS 단일 운영 환경 구성 및 성능 최적화 완료
-- 🔄 발전소 등록 API 개발 (POST /api/v1/plants)
-- 🔄 발전소 정보 수정 API 개발 (PUT /api/v1/plants/{id})
-- 🔄 발전소 삭제 API 개발 (DELETE /api/v1/plants/{id})
-- 🔄 사용자 계정 관리 보완 (createdAt, lastLoginAt 로그 기록)
-- 🔄 권한 관리 시스템(RBAC) 설계 (ADMIN/USER/VIEWER 권한 분리)
+
+**앞으로 해야 할 일:**
+- [ ] 배치 스케줄러 구현 (EnergyAggregationService 시간별/일별 집계)
+- [ ] 대용량 데이터 스트레스 테스트 (1개월 이상 데이터)
+- [ ] RDS 쿼리 최적화 (복합 인덱스, 쿼리 플랜 분석)
+
 ### AI/데이터 연동 영역 (박채리)
-- ✅ AI 클라이언트 및 예측/이상 탐지 연동 완료
-- ✅ 데이터 파이프라인 통합 완료 (PlantFeatureLog 단일화)
-- ✅ CSV 중복 업로드 방지 로직 적용 (@Transactional + deleteBy)
-- ✅ 가상 시간 시뮬레이션 기초 아키텍처 완성
-  - SimulationService, SimulationController 뼈대 구축
-  - 가상 시간 기준 데이터 필터링 적용
-- ✅ AI 연동 비동기 처리 (@Async) 최적화 완료
-- 🔄 발전량 조작 시뮬레이션 API 개발 (파일 없이 40% 감소 트리거)
+
+**앞으로 해야 할 일:**
+- [ ] ChatSession, ChatMessage 엔티티 + API 구현 (Phase 6)
+- [ ] AlertSetting, AlertHistory 엔티티 + API 구현 (Phase 6)
+- [ ] 알림 설정 관리 페이지 연동
 - 🔄 비전 이상 시뮬레이션 API 개발 (이미지 URL 기반 CRACK/DIRT 생성)
 - 🔄 이메일 알림 연동 (JavaMailSender 활용 HIGH 등급 자동 발송)
 - 🔄 에너지 데이터 집계 배치 스케줄러 개발 (시간/일/월 단위 Aggregation)
@@ -317,19 +330,21 @@ src/main/java/com/solarwise/capstonebackend/
 
 ## 다음 작업 우선순위
 
-### 🚀 P0 (현재 진행 중 - 이번주 5/12~5/16)
+### 🎯 P0 (5/12-5/18 완료 ✅)
 
-#### **7가지 최우선 과제 (순차적 구현)**
+#### **7가지 최우선 과제 - 완료 현황**
 
-| # | API | 메서드 | 우선 | 담당 | 상태 | 비고 |
-|---|-----|--------|------|------|------|------|
-| 1️⃣ | **POST /api/v1/plants** | 발전소 등록 | P0 | 이승윤 | 🔄 | 발전소 신규 생성 |
-| 2️⃣ | **PUT /api/v1/plants/{plantId}** | 발전소 정보 수정 | P0 | 이승윤 | 🔄 | 이름, 용량, 위치 등 |
-| 3️⃣ | **PATCH /api/v1/plants/{plantId}/anomalies/{eventId}/status** | 이상 상태 변경 | P0 | 이승윤 | ✅ | Enum(OPEN, ACKNOWLEDGED, RESOLVED) |
-| 4️⃣ | **POST /api/v1/simulation/trigger-power-anomaly** | 발전량 시뮬레이션 | P0 | 박채리 | 🔄 | enableDemoCheat: 40% 감소 |
-| 5️⃣ | **POST /api/v1/simulation/trigger-vision-anomaly** | 비전 시뮬레이션 | P0 | 박채리 | 🔄 | enableDemoCheat: CRACK/DIRT 생성 |
-| 6️⃣ | **이메일 알림 수동 발송** | JavaMailSender | P0 | 박채리 | 🔄 | HIGH 등급 이상 자동 발송 |
-| 7️⃣ | **로그인 일시 기록** | 계정 추적 | P0 | 이승윤 | 🔄 | createdAt, lastLoginAt 필드 |
+| # | API | 메서드 | 담당 | 완료 |
+|---|-----|--------|------|------|
+| 1️⃣ | **POST /api/v1/plants** | 발전소 등록 | 이승윤 | ✅ 5/12 |
+| 2️⃣ | **PUT /api/v1/plants/{plantId}** | 발전소 정보 수정 | 이승윤 | ✅ 5/12 |
+| 3️⃣ | **DELETE /api/v1/plants/{plantId}** | 발전소 삭제 | 이승윤 | ✅ 5/12 |
+| 4️⃣ | **PATCH /api/v1/plants/{plantId}/anomalies/{eventId}/status** | 이상 상태 변경 | 이승윤 | ✅ 5/11 |
+| 5️⃣ | **POST /api/v1/simulation/trigger-power-anomaly** | 발전량 시뮬레이션 | 박채리 | ✅ 5/17 |
+| 6️⃣ | **POST /api/v1/simulation/trigger-vision-anomaly** | 비전 시뮬레이션 | 박채리 | ✅ 5/18 |
+| 7️⃣ | **User.lastLoginAt + 이메일 알림** | 계정 로그 + 알림 | 이승윤 + 박채리 | ✅ 5/12-18 |
+
+**진행률**: 7/7 완료 (100%) ✅
 
 ---
 
@@ -562,6 +577,27 @@ public class User {
     - 기상청 예측: 13:30 맑음 회복
     - 자동 모니터링 중 (5분 주기)
 ```
+
+---
+
+### 🚀 P1 (5/19~5/23)
+1. **배치 스케줄러** - `EnergyAggregationService` 시간별/일별 데이터 집계
+2. **대용량 데이터 스트레스 테스트** - 1개월 이상 데이터 성능 검증
+3. **RDS 쿼리 최적화** - 복합 인덱스 추가, 쿼리 플랜 분석
+
+### 🎯 P2 (5/26~5/30)
+1. `ChatSession`, `ChatMessage` 엔티티 + API (Phase 6)
+2. `AlertSetting`, `AlertHistory` 엔티티 + API (Phase 6)
+3. 알림 설정 관리 페이지 연동
+
+### 🔐 P3 (다음달 초)
+1. 권한 세분화 (ROLE: ADMIN, USER, VIEWER)
+2. 발전소별 사용자 권한 매핑
+3. API 엔드포인트별 역할 검증 강화
+
+### 📊 P4 (다음달 중순)
+1. 알림 이력 관리 및 메일 발송 통합
+2. 성능 모니터링 대시보드 구축
 
 ---
 
