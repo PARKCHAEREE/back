@@ -3,6 +3,7 @@ package com.solarwise.capstonebackend.service;
 import com.solarwise.capstonebackend.entity.Anomaly;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.scheduling.annotation.Async;
@@ -10,7 +11,7 @@ import org.springframework.stereotype.Service;
 
 /**
  * 알림 서비스
- * - 이상 탐지 시 이메일 알림 발송
+ * - 이상 탐지 시 이메일 알림 발송 (네이버 SMTP 연동)
  * - 비동기 처리로 API 응답 지연 방지
  */
 @Slf4j
@@ -19,7 +20,10 @@ import org.springframework.stereotype.Service;
 public class NotificationService {
 
     private final JavaMailSender javaMailSender;
-    private static final String SENDER_EMAIL = "noreply-solarwise@capstone.ai";
+
+    // application.properties에서 네이버 아이디를 읽어옵니다.
+    @Value("${spring.mail.username}")
+    private String senderUsername;
 
     /**
      * 이상 탐지 알림 발송 (HIGH 등급만)
@@ -42,7 +46,7 @@ public class NotificationService {
                 return;
             }
 
-            String mailSubject = "[HIGH] " + anomaly.getDescription();
+            String mailSubject = "[HIGH] " + anomaly.getPowerPlant().getName() + " - " + anomaly.getDescription();
             String mailBody = buildEmailBody(anomaly);
 
             sendEmail(toEmail, mailSubject, mailBody);
@@ -62,7 +66,9 @@ public class NotificationService {
      */
     private void sendEmail(String to, String subject, String body) {
         SimpleMailMessage message = new SimpleMailMessage();
-        message.setFrom(SENDER_EMAIL);
+
+        // 네이버 SMTP 필수 규칙: 보내는 사람은 반드시 "네이버아이디@naver.com" 형태여야 함
+        message.setFrom(senderUsername);
         message.setTo(to);
         message.setSubject(subject);
         message.setText(body);
@@ -110,4 +116,3 @@ public class NotificationService {
         return body.toString();
     }
 }
-

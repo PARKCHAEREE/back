@@ -3,12 +3,14 @@ package com.solarwise.capstonebackend.service;
 import com.solarwise.capstonebackend.dto.DashboardResponse;
 import com.solarwise.capstonebackend.entity.PowerPlant;
 import com.solarwise.capstonebackend.exception.ResourceNotFoundException;
+import com.solarwise.capstonebackend.repository.AnomalyRepository;
 import com.solarwise.capstonebackend.repository.PowerPlantRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * 대시보드 서비스
@@ -23,6 +25,7 @@ public class DashboardService {
     private final EnergyAggregationService energyAggregationService;
     private final AnomalyService anomalyService;
     private final SimulationService simulationService;
+    private final AnomalyRepository anomalyRepository;
 
     /**
      * 발전소 대시보드 조회
@@ -43,5 +46,7 @@ public class DashboardService {
                 .recentAnomalies(anomalyService.getRecentAnomalies(powerPlantId, 10))
                 .build();
     }
+
+    // 패널 히트맵 기능은 제거됨 (PanelHeatmapDto 삭제에 따라 관련 로직 정리)
 
 }

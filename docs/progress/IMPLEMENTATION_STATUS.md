@@ -88,16 +88,14 @@
   - HIGH 등급 이상만 자동 발송
   - Lazy Loading 에러 방지 (트랜잭션 경계 최적화) ✨ (5/18 개선)
   - 3개 서비스 통합: SimulationService, AiIntegrationService 등
-- 🔄 구현 필요:
-  - `EnergyAggregationService` 시간별/일별 데이터 집계 배치 스케줄러
 
-### 🔄 Phase 6: 챗 및 알림 (대기)
-- 구현 필요:
-  - `POST /api/v1/plants/{plantId}/chat/sessions` - 세션 생성
-  - `POST /api/v1/plants/{plantId}/chat/sessions/{sessionId}/messages` - 메시지
-  - `GET /api/v1/plants/{plantId}/alert-settings` - 알림 설정 조회
-  - `PUT /api/v1/plants/{plantId}/alert-settings` - 알림 설정 변경
-  - `GET /api/v1/plants/{plantId}/alerts` - 알림 이력
+### 🔄 Phase 6: 챗 및 알림 (진행 중 - 75%)
+- ✅ `POST /api/v1/plants/{plantId}/chat/sessions` - 챗 세션 생성 API 구현 완료
+- ✅ `POST /api/v1/plants/{plantId}/chat/sessions/{sessionId}/messages` - 메시지 전송 및 더미 AI 응답 로직 구현 완료
+- ✅ `GET /api/v1/plants/{plantId}/alerts` - 시뮬레이터 연동 알림 이력 조회 API 구현 완료
+- 🔄 AI 팀 LLM(GPT/Gemini 등) 엔드포인트 수령 후 진짜 AI 응답 최종 연동 대기
+- 🔄 `GET /api/v1/plants/{plantId}/alert-settings` - 알림 설정 조회 (대기)
+- 🔄 `PUT /api/v1/plants/{plantId}/alert-settings` - 알림 설정 변경 (대기)
 
 ## 데이터베이스 환경
 

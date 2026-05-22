@@ -67,6 +67,7 @@ public class SimulationService {
      * - Anomaly 엔티티를 생성하고 저장한 뒤 알림을 발송합니다.
      * - 시간은 반드시 가상 시간을 사용합니다.
      */
+    @Transactional
     public Anomaly triggerPowerAnomaly(PowerAnomalyTriggerRequest request) {
         PowerPlant plant = powerPlantRepository.findById(request.getPlantId())
                 .orElseThrow(() -> new IllegalArgumentException("발전소를 찾을 수 없습니다. ID: " + request.getPlantId()));

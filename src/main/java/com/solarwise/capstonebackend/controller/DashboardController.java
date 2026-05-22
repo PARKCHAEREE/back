@@ -4,6 +4,7 @@ import com.solarwise.capstonebackend.dto.ApiResponse;
 import com.solarwise.capstonebackend.dto.DashboardSummaryDto;
 import com.solarwise.capstonebackend.dto.MeasurementCsvUploadResult;
 import com.solarwise.capstonebackend.dto.MeasurementSeriesDto;
+import com.solarwise.capstonebackend.service.DashboardService;
 import com.solarwise.capstonebackend.service.MeasurementService;
 import com.solarwise.capstonebackend.service.SimulationService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -19,6 +20,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
+// Panel heatmap DTO and endpoint removed
 
 /**
  * 대시보드 컨트롤러
@@ -32,6 +34,7 @@ import java.time.LocalDateTime;
 public class DashboardController {
 
     private final MeasurementService measurementService;
+    private final DashboardService dashboardService;
     private final SimulationService simulationService;
 
     /**
