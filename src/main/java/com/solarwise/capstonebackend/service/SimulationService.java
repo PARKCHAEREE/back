@@ -2,8 +2,10 @@ package com.solarwise.capstonebackend.service;
 
 import com.solarwise.capstonebackend.dto.PowerAnomalyTriggerRequest;
 import com.solarwise.capstonebackend.entity.Anomaly;
+import com.solarwise.capstonebackend.entity.PlantFeatureLog;
 import com.solarwise.capstonebackend.entity.PowerPlant;
 import com.solarwise.capstonebackend.repository.AnomalyRepository;
+import com.solarwise.capstonebackend.repository.PlantFeatureLogRepository;
 import com.solarwise.capstonebackend.repository.PowerPlantRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -12,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import com.solarwise.capstonebackend.repository.VisionAnalysisRepository;
 import com.solarwise.capstonebackend.entity.VisionAnalysis;
@@ -26,14 +29,24 @@ import com.solarwise.capstonebackend.entity.VisionAnalysis;
 @RequiredArgsConstructor
 public class SimulationService {
 
+    // 1초=1시간 재생 기준으로 트리거 후 약 5초 뒤 이상이 보이게 지연
+    private static final int POWER_ANOMALY_DELAY_HOURS = 5;
+
     // 가상 현재 시간 (초기값: 2026-03-15 13:00:00)
     private LocalDateTime virtualCurrentTime = LocalDateTime.of(2026, 3, 15, 13, 0);
 
     // 드론 에러 트리거 플래그
     private final AtomicBoolean triggerNextError = new AtomicBoolean(false);
 
+    // 시연용 자동 재생 상태
+    private final AtomicBoolean playbackRunning = new AtomicBoolean(false);
+
+    // 마지막 tick 시점(가상 시간 기준)
+    private volatile LocalDateTime lastTickAt;
+
     private final PowerPlantRepository powerPlantRepository;
     private final AnomalyRepository anomalyRepository;
+    private final PlantFeatureLogRepository plantFeatureLogRepository;
     private final NotificationService notificationService;
     private final VisionAnalysisRepository visionAnalysisRepository;
 
@@ -42,16 +55,43 @@ public class SimulationService {
      *
      * @return 가상 현재 시간
      */
-    public LocalDateTime getVirtualCurrentTime() {
+    public synchronized LocalDateTime getVirtualCurrentTime() {
         return virtualCurrentTime;
     }
 
     /**
      * 가상 시간을 1시간 앞으로 땡깁니다.
      */
-    public void advanceTimeByHour() {
+    public synchronized void advanceTimeByHour() {
         virtualCurrentTime = virtualCurrentTime.plusHours(1);
+        lastTickAt = virtualCurrentTime;
         log.info("가상 시간 1시간 전진: {}", virtualCurrentTime);
+    }
+
+    public void startPlayback() {
+        playbackRunning.set(true);
+        log.info("시뮬레이션 자동 재생 시작");
+    }
+
+    public void stopPlayback() {
+        playbackRunning.set(false);
+        log.info("시뮬레이션 자동 재생 정지");
+    }
+
+    public boolean isPlaybackRunning() {
+        return playbackRunning.get();
+    }
+
+    public int getPlaybackTickSeconds() {
+        return 1;
+    }
+
+    public int getPlaybackStepHours() {
+        return 1;
+    }
+
+    public LocalDateTime getLastTickAt() {
+        return lastTickAt;
     }
 
     /**
@@ -64,8 +104,8 @@ public class SimulationService {
 
     /**
      * 시뮬레이션용 발전량 이상 트리거
-     * - Anomaly 엔티티를 생성하고 저장한 뒤 알림을 발송합니다.
-     * - 시간은 반드시 가상 시간을 사용합니다.
+     * - 트리거 시점 "이후"의 미래 데이터(actual)를 조작해 대시보드에서 시간이 지나며 이상이 관측되도록 합니다.
+     * - Anomaly는 미래 시작 시점(detectedAt)으로 저장합니다.
      */
     @Transactional
     public Anomaly triggerPowerAnomaly(PowerAnomalyTriggerRequest request) {
@@ -73,6 +113,27 @@ public class SimulationService {
                 .orElseThrow(() -> new IllegalArgumentException("발전소를 찾을 수 없습니다. ID: " + request.getPlantId()));
 
         LocalDateTime now = getVirtualCurrentTime();
+        int durationHours = request.getDurationHours() == null ? 2 : Math.max(1, request.getDurationHours());
+        double differencePercentage = request.getDifferencePercentage() == null ? 30.0 : Math.max(0.0, request.getDifferencePercentage());
+        double reductionFactor = Math.max(0.0, 1.0 - (differencePercentage / 100.0));
+
+        // 시연 자연스러움을 위해 트리거 후 5초(=가상시간 5시간) 지연 후부터 조작
+        LocalDateTime anomalyStart = now.plusHours(POWER_ANOMALY_DELAY_HOURS);
+        LocalDateTime anomalyEnd = anomalyStart.plusHours(durationHours - 1L);
+
+        List<PlantFeatureLog> targetLogs = plantFeatureLogRepository
+                .findByPowerPlantIdAndMeasuredAtBetweenOrderByMeasuredAtAsc(plant.getId(), anomalyStart, anomalyEnd);
+
+        int adjustedCount = 0;
+        for (PlantFeatureLog featureLog : targetLogs) {
+            Double baseline = featureLog.getPrediction() != null ? featureLog.getPrediction() : featureLog.getActual();
+            if (baseline == null) {
+                continue;
+            }
+            featureLog.setActual(baseline * reductionFactor);
+            adjustedCount++;
+        }
+        plantFeatureLogRepository.saveAll(targetLogs);
 
         Anomaly anomaly = Anomaly.builder()
                 .powerPlant(plant)
@@ -80,23 +141,20 @@ public class SimulationService {
                 .summary("시뮬레이션 트리거: 발전량 이상")
                 .description(request.getDescription())
                 .severity(request.getAnomalySeverity())
-                .cause(String.format("시뮬레이션: 차이율 %.2f%%, 지속시간 %dh",
-                        request.getDifferencePercentage() == null ? 0.0 : request.getDifferencePercentage(),
-                        request.getDurationHours() == null ? 0 : request.getDurationHours()))
+                .cause(String.format("미래 데이터 조작: %.2f%% 감소, 기간 %s ~ %s, 적용 건수 %d",
+                        differencePercentage,
+                        anomalyStart,
+                        anomalyEnd,
+                        adjustedCount))
                 .recommendedAction(null)
                 .status("OPEN")
-                .detectedAt(now)
+                .detectedAt(anomalyStart)
                 .createdAt(now)
                 .updatedAt(now)
                 .build();
 
-        Anomaly saved = anomalyRepository.save(anomaly);
-
-        // Lazy Loading 에러 방지: 이메일을 미리 추출한 후 전달
-        String ownerEmail = plant.getUser().getEmail();
-        notificationService.sendAnomalyAlert(saved, ownerEmail);
-
-        return saved;
+        // 알림/관측은 대시보드 시간이 anomalyStart를 지날 때 시연 흐름에서 확인
+        return anomalyRepository.save(anomaly);
     }
 
     /**
@@ -147,12 +205,17 @@ public class SimulationService {
     }
 
     /**
-     * 1분마다 실행되는 스케줄러
+     * 1초마다 실행되는 스케줄러
      * - 가상 시간을 1시간 증가
      * - 드론 에러 트리거가 설정된 경우 이미지 이상 탐지 수행
      */
-    @Scheduled(fixedRate = 60000) // 1분 = 60000ms
+    @Scheduled(fixedRate = 1000) // 1초 = 1000ms
+    @Transactional
     public void simulateTimeProgression() {
+        if (!playbackRunning.get()) {
+            return;
+        }
+
         // 가상 시간 1시간 증가
         advanceTimeByHour();
 
@@ -168,4 +231,5 @@ public class SimulationService {
             // detectVisionAnomaly(plantId, "PANEL_001", normalImageBase64);
         }
     }
+
 }

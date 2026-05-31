@@ -28,8 +28,16 @@ public class JwtUtil {
      * 사용자 ID를 기반으로 JWT 토큰 생성
      */
     public String generateToken(String userId) {
+        return generateToken(userId, null);
+    }
+
+    /**
+     * 사용자 ID/role 기반 JWT 토큰 생성
+     */
+    public String generateToken(String userId, String role) {
         return Jwts.builder()
                 .setSubject(userId)
+                .claim("role", role)
                 .setIssuedAt(new Date())
                 .setExpiration(new Date(System.currentTimeMillis() + expirationTime))
                 .signWith(getSigningKey(), SignatureAlgorithm.HS256)
@@ -49,6 +57,25 @@ public class JwtUtil {
                     .getSubject();
         } catch (JwtException | IllegalArgumentException e) {
             log.error("토큰 파싱 실패: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * JWT 토큰에서 사용자 role 추출
+     */
+    public String extractRole(String token) {
+        try {
+            Object role = Jwts.parserBuilder()
+                    .setSigningKey(getSigningKey())
+                    .build()
+                    .parseClaimsJws(token)
+                    .getBody()
+                    .get("role");
+
+            return role == null ? null : role.toString();
+        } catch (JwtException | IllegalArgumentException e) {
+            log.error("토큰 role 파싱 실패: {}", e.getMessage());
             return null;
         }
     }
