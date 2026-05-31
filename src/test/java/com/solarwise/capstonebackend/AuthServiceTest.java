@@ -49,6 +49,7 @@ class AuthServiceTest {
                 .email("owner@solarwise.com")
                 .password("encoded")
                 .name("owner")
+                .role("ADMIN")
                 .active(true)
                 .build();
         LocalDateTime virtualNow = LocalDateTime.of(2026, 5, 12, 14, 0);
@@ -56,7 +57,7 @@ class AuthServiceTest {
         when(userRepository.findByEmail("owner@solarwise.com")).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("raw-password", "encoded")).thenReturn(true);
         when(simulationService.getVirtualCurrentTime()).thenReturn(virtualNow);
-        when(jwtUtil.generateToken("10")).thenReturn("token-abc");
+        when(jwtUtil.generateToken("10", "ADMIN")).thenReturn("token-abc");
         when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         LoginResponse response = authService.login(LoginRequest.builder()

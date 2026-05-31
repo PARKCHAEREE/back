@@ -75,7 +75,7 @@ public class AuthService {
         user.setUpdatedAt(virtualNow);
         userRepository.save(user);
 
-        String accessToken = jwtUtil.generateToken(user.getId().toString());
+        String accessToken = jwtUtil.generateToken(user.getId().toString(), user.getRole());
 
         log.info("사용자 로그인: userId={}, email={}", user.getId(), user.getEmail());
 

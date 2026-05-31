@@ -1,6 +1,7 @@
 package com.solarwise.capstonebackend.controller;
 
 import com.solarwise.capstonebackend.dto.ApiResponse;
+import com.solarwise.capstonebackend.dto.DashboardTimelineResponse;
 import com.solarwise.capstonebackend.dto.DashboardSummaryDto;
 import com.solarwise.capstonebackend.dto.MeasurementCsvUploadResult;
 import com.solarwise.capstonebackend.dto.MeasurementSeriesDto;
@@ -54,6 +55,33 @@ public class DashboardController {
 
         DashboardSummaryDto response = measurementService.getDashboardSummary(plantId, Long.parseLong(userId));
         return ResponseEntity.ok(ApiResponse.success(response, "대시보드 요약 조회 성공"));
+    }
+
+    /**
+     * 대시보드 타임라인 통합 조회
+     */
+    @GetMapping("/dashboard/timeline")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "대시보드 타임라인 통합 조회", description = "실측/예측/괴리/이상 마커를 range 기준으로 조회")
+    public ResponseEntity<ApiResponse<DashboardTimelineResponse>> getDashboardTimeline(
+            @PathVariable Long plantId,
+            @RequestParam(required = false, defaultValue = "DAY") String range,
+            @RequestParam(required = false) Integer futureHours,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to) {
+
+        String userId = (String) SecurityContextHolder.getContext()
+                .getAuthentication()
+                .getPrincipal();
+
+        DashboardTimelineResponse response = dashboardService.getDashboardTimeline(
+                plantId,
+                Long.parseLong(userId),
+                range,
+                futureHours,
+                to
+        );
+
+        return ResponseEntity.ok(ApiResponse.success(response, "대시보드 타임라인 조회 성공"));
     }
 
     /**
