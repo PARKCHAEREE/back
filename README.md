@@ -233,6 +233,16 @@ server.port=8081
 테스트는 H2 메모리 DB를 사용합니다. (테스트 전용)
 운영/개발 실행은 RDS 프로필을 사용하세요.
 
+### CSV 업로드 실패 (BOM / 파일 크기)
+- `Weather` CSV 업로드(`upload-advisor-csv`)는 헤더 매핑을 사용하므로 **UTF-8 BOM 없는 CSV**를 권장합니다.
+- UTF-8 BOM이 있으면 첫 컬럼이 `TIME`이 아닌 `\uFEFFTIME`으로 인식되어 파싱이 실패할 수 있습니다.
+- 대용량 CSV는 기본 multipart 제한(예: 1MB) 때문에 실패할 수 있으므로 아래 설정을 권장합니다.
+
+```properties
+spring.servlet.multipart.max-file-size=20MB
+spring.servlet.multipart.max-request-size=20MB
+```
+
 ## 팀 협업
 
 ### Git 브랜치 전략
