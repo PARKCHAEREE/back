@@ -358,6 +358,29 @@ public class AiIntegrationService {
         //         .irradiation(0.5) // TODO: WeatherData에서 조회
         //         .build())
         //     .collect(Collectors.toList());
+        // 지금은 테스트를 위해 방금 추가한 10개 변수(기본값 0)가 포함된 더미 데이터 1건을 만들어서 보냅니다.
+        HistoryDataDto dummyData = HistoryDataDto.builder()
+                .timestamp(LocalDateTime.now().minusHours(1))
+                .actualPowerKw(50.0)
+                .irradiation(0.5)
+                .ambientTemperature(20.0)
+                .moduleTemperature(25.0)
+                .windSpeed(2.0)
+                .humidity(50.0)
+                // 새로 추가된 결함 피처 10개 매핑 (일단 기본값 0 세팅)
+                .dustCoverageRatio(0.0)
+                .snowCoverageRatio(0.0)
+                .birdDroppingCount(0)
+                .physicalDamageCount(0)
+                .maxDefectConfidence(0.0)
+                .clsNormal(0)
+                .clsDust(0)
+                .clsSnow(0)
+                .clsBird(0)
+                .clsDamage(0)
+                .build();
+
+        history.add(dummyData);
 
         log.debug("히스토리 데이터 {}건 구성", history.size());
         return history;
@@ -618,5 +641,19 @@ public class AiIntegrationService {
             return 0.0;
         }
         return ((response.getPredictedPower() - response.getActualPower()) / response.getPredictedPower()) * 100;
+    }
+    /**
+     * ✨ 시연용: resources/images 폴더에서 사진을 읽어 Base64 텍스트로 변환합니다.
+     * @param fileName 읽어올 파일 이름 (예: crack.jpg)
+     */
+    public String encodeImageToBase64(String fileName) {
+        try {
+            org.springframework.core.io.ClassPathResource resource = new org.springframework.core.io.ClassPathResource("images/" + fileName);
+            byte[] imageBytes = java.nio.file.Files.readAllBytes(resource.getFile().toPath());
+            return java.util.Base64.getEncoder().encodeToString(imageBytes);
+        } catch (Exception e) {
+            log.error("사진 파일을 읽는 데 실패했습니다: {}", fileName, e);
+            throw new RuntimeException("사진 파일을 찾을 수 없습니다.");
+        }
     }
 }
