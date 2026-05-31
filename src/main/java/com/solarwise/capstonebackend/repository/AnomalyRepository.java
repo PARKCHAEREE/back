@@ -20,6 +20,12 @@ public interface AnomalyRepository extends JpaRepository<Anomaly, Long> {
 
     List<Anomaly> findByPowerPlantIdAndStatusOrderByDetectedAtDesc(Long powerPlantId, String status);
 
+    List<Anomaly> findByPowerPlantIdAndDetectedAtBetweenOrderByDetectedAtAsc(
+            Long powerPlantId,
+            LocalDateTime from,
+            LocalDateTime to
+    );
+
     boolean existsByPowerPlantIdAndTypeAndStatus(Long powerPlantId, String type, String status);
 }
 

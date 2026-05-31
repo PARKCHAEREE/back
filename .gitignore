@@ -50,3 +50,7 @@ data/csv/measurements/*.csv
 data/csv/samples/*.csv
 # ��, README.md�� ���� ������ ����
 !data/csv/README.md
+
+# local runtime logs
+bootrun-rds.log
+
