@@ -585,7 +585,7 @@ public class AiIntegrationService {
 
         // Lazy Loading 에러 방지: 이메일을 미리 추출한 후 전달
         String ownerEmail = powerPlant.getUser().getEmail();
-        notificationService.sendAnomalyAlert(savedAnomaly, ownerEmail);
+        notificationService.sendAnomalyAlert(ownerEmail, savedAnomaly);
     }
 
     /**
@@ -630,7 +630,7 @@ public class AiIntegrationService {
 
         // Lazy Loading 에러 방지: 이메일을 미리 추출한 후 전달
         String ownerEmail = powerPlant.getUser().getEmail();
-        notificationService.sendAnomalyAlert(savedAnomaly, ownerEmail);
+        notificationService.sendAnomalyAlert(ownerEmail, savedAnomaly);
     }
 
     /**

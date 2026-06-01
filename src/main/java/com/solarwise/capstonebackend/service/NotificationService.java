@@ -34,7 +34,7 @@ public class NotificationService {
      * @param toEmail 수신자 이메일 주소
      */
     @Async
-    public void sendAnomalyAlert(Anomaly anomaly, String toEmail) {
+    public void sendAnomalyAlert(String toEmail, Anomaly anomaly) {
         try {
             // HIGH 등급이 아니면 발송 안 함
             if (anomaly == null || !"HIGH".equals(anomaly.getSeverity())) {
@@ -46,8 +46,9 @@ public class NotificationService {
                 return;
             }
 
-            String mailSubject = "[HIGH] " + anomaly.getPowerPlant().getName() + " - " + anomaly.getDescription();
-            String mailBody = buildEmailBody(anomaly);
+            // 네이버 SMTP 정책에 맞춘 발신자와 제목/본문 포맷
+            String mailSubject = "[SOLARWISE 경고] " + anomaly.getPowerPlant().getName() + " - 이상 감지 알림";
+            String mailBody = buildEmailBodyForNaver(anomaly);
 
             sendEmail(toEmail, mailSubject, mailBody);
             log.info("Successfully sent anomaly alert email to {} for anomaly ID {}", toEmail, anomaly.getId());
@@ -68,7 +69,10 @@ public class NotificationService {
         SimpleMailMessage message = new SimpleMailMessage();
 
         // 네이버 SMTP 필수 규칙: 보내는 사람은 반드시 "네이버아이디@naver.com" 형태여야 함
-        message.setFrom(senderUsername);
+        // application.properties의 spring.mail.username은 네이버 아이디만 담도록 권장합니다.
+        // 발신자 형식은 username@naver.com 으로 설정합니다.
+        String fromAddress = senderUsername != null && senderUsername.contains("@") ? senderUsername : senderUsername + "@naver.com";
+        message.setFrom(fromAddress);
         message.setTo(to);
         message.setSubject(subject);
         message.setText(body);
@@ -83,36 +87,23 @@ public class NotificationService {
      * @return 이메일 본문
      */
     private String buildEmailBody(Anomaly anomaly) {
-        StringBuilder body = new StringBuilder();
+        return buildEmailBodyForNaver(anomaly);
+    }
 
-        body.append("안녕하세요, SolarWise 팀입니다.\n\n");
-        body.append("발전소 모니터링 중 HIGH 등급의 이상이 감지되었습니다.\n\n");
-
-        body.append("=== 이상 탐지 정보 ===\n");
-        body.append("발전소명: ").append(anomaly.getPowerPlant().getName()).append("\n");
-        body.append("이상 유형: ").append(anomaly.getType()).append("\n");
-        body.append("심각도: ").append(anomaly.getSeverity()).append("\n");
-        body.append("요약: ").append(anomaly.getSummary()).append("\n");
-        body.append("상세 설명: ").append(anomaly.getDescription()).append("\n\n");
-
-        if (anomaly.getCause() != null && !anomaly.getCause().isEmpty()) {
-            body.append("원인: ").append(anomaly.getCause()).append("\n\n");
-        }
-
-        if (anomaly.getRecommendedAction() != null && !anomaly.getRecommendedAction().isEmpty()) {
-            body.append("권장 조치: ").append(anomaly.getRecommendedAction()).append("\n\n");
-        }
-
-        if (anomaly.getXaiExplanation() != null && !anomaly.getXaiExplanation().isEmpty()) {
-            body.append("AI 분석 근거: ").append(anomaly.getXaiExplanation()).append("\n\n");
-        }
-
-        body.append("감지 일시: ").append(anomaly.getDetectedAt()).append("\n");
-        body.append("상태: ").append(anomaly.getStatus()).append("\n\n");
-
-        body.append("대시보드에서 자세한 내용을 확인하시기 바랍니다.\n");
-        body.append("SolarWise 팀 드림");
-
-        return body.toString();
+    /**
+     * 네이버 전송용 간략 텍스트 템플릿
+     */
+    private String buildEmailBodyForNaver(Anomaly anomaly) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("안녕하세요. SolarWise 알림입니다.\n\n");
+        sb.append("🚨 심각도: ").append(anomaly.getSeverity()).append("\n\n");
+        sb.append("📊 이상 요약: ").append(anomaly.getSummary() == null ? "-" : anomaly.getSummary()).append("\n\n");
+        sb.append("🔍 추정 원인: ").append(anomaly.getCause() == null ? "-" : anomaly.getCause()).append("\n\n");
+        sb.append("🛠️ 권장 조치: ").append(anomaly.getRecommendedAction() == null ? "-" : anomaly.getRecommendedAction()).append("\n\n");
+        sb.append("발전소: ").append(anomaly.getPowerPlant() != null ? anomaly.getPowerPlant().getName() : "-").append("\n");
+        sb.append("감지 일시: ").append(anomaly.getDetectedAt()).append("\n\n");
+        sb.append("자세한 내용은 대시보드에서 확인하세요.\n");
+        sb.append("SolarWise 팀");
+        return sb.toString();
     }
 }

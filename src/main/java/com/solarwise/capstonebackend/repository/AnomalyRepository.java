@@ -26,6 +26,9 @@ public interface AnomalyRepository extends JpaRepository<Anomaly, Long> {
             LocalDateTime to
     );
 
+    // 시뮬레이션 타이밍용: detectedAt이 현재 시점 이하이고 상태가 OPEN인 이벤트 조회
+    List<Anomaly> findByDetectedAtLessThanEqualAndStatus(LocalDateTime detectedAt, String status);
+
     boolean existsByPowerPlantIdAndTypeAndStatus(Long powerPlantId, String type, String status);
 }
 
