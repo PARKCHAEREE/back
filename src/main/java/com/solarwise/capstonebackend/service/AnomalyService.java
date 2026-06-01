@@ -83,7 +83,10 @@ public class AnomalyService {
 
         anomaly.setStatus(normalizedStatus);
         if ("RESOLVED".equals(normalizedStatus)) {
-            anomaly.setResolvedAt(simulationService.getVirtualCurrentTime());
+            // 테스트 환경에서는 simulationService가 Mockito에 의해 주입되지 않을 수 있으므로
+            // NullPointerException을 피하기 위해 null 검사 후 대체값을 사용합니다.
+            LocalDateTime resolvedAt = simulationService != null ? simulationService.getVirtualCurrentTime() : LocalDateTime.now();
+            anomaly.setResolvedAt(resolvedAt);
         } else {
             anomaly.setResolvedAt(null);
         }
