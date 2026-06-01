@@ -10,6 +10,40 @@
 
 ---
 
+### 최근 업데이트 (2026-06-01)
+
+- WebFlux 제거 및 로컬 시연 안정화 관련 코드·문서 반영
+  - `build.gradle`에서 `spring-boot-starter-webflux` 의존성 제거
+  - `AsyncConfig` 추가: 제한된 `ThreadPoolTaskExecutor`로 `@Async` 제어
+  - `WebConfig` 수정: `RestTemplate`에 connect/read timeout 설정(5s/10s) 및 CORS를 로컬 프론트엔드(origin 제한)로 조정
+
+- 이메일 알림 관련 변경
+  - `NotificationService`를 네이버 SMTP 규칙(발신자 주소는 `spring.mail.username`)에 맞게 수정
+  - `sendAnomalyAlert(String toEmail, Anomaly anomaly)` 시그니처로 통일
+  - `SimulationService`와 `AiIntegrationService` 호출 흐름을 이메일용 `toEmail` 문자열을 트랜잭션 내에서 추출한 뒤 비동기로 전달하도록 변경
+
+- 시뮬레이션 / 알림 동작 변경
+  - `SimulationService`에서 메일 발송 후 DB 상태를 변경하던 기존 로직을 제거하고, 인메모리 `notifiedAnomalyIds`(ConcurrentHashMap 기반 Set)를 도입하여 중복 발송을 방지
+  - DB의 `status`는 항상 `OPEN`으로 유지되도록 수정(요구 반영)
+
+- Dashboard 과다쿼리 방어
+  - `DashboardService`에 간단한 `ConcurrentHashMap` 기반 인메모리 캐시 추가(시뮬레이션의 `lastTickAt`으로 유효성 검증)
+  - 문서 주석: "이 부분은 팀원과 스키마 변경 공유가 필요합니다"
+
+- 문서 및 로그 파일 생성
+  - `docs/progress/DAILY_LOG_2026-06-01.md` 생성(오늘 작업 요약)
+  - 최종 커밋: `c2c3d7716e414777cea69dfc53f0275ffab91819` (메시지: `docs: add DAILY_LOG_2026-06-01`)
+
+- 테스트 관련(참고)
+  - 사용자의 요청에 따라 현재 레포지토에서 전체 테스트는 실행하지 않음
+  - 이전 테스트 실행 시 ApplicationContext 로드 실패가 발생했습니다(원인: 테스트 환경에 `JavaMailSender` 빈 없음). 핵심 오류:
+
+```
+Caused by: org.springframework.beans.factory.NoSuchBeanDefinitionException: No qualifying bean of type 'org.springframework.mail.javamail.JavaMailSender' available: expected at least 1 bean which qualifies as autowire candidate. Dependency annotations: {}
+```
+
+  - 권장 조치: `src/test/java/.../MailTestConfig`에 `@TestConfiguration`으로 `JavaMailSender` 모킹 빈을 추가하거나 `src/test/resources/application.properties`에 최소 `spring.mail.*` 설정 추가
+
 ## 현재 진행 상황
 
 ### ✅ Phase 1: 기본 인증 및 발전소 CRUD (완료)
