@@ -36,6 +36,12 @@ public class DashboardService {
     private final AnomalyRepository anomalyRepository;
     private final PlantFeatureLogRepository plantFeatureLogRepository;
 
+    // 인메모리 캐시를 사용하여 초당 반복 호출 시 DB 부하를 줄입니다.
+    // 주의: 이 캐시 로직은 시연용으로 단순화되어 있으며, 실제 운영 시에는
+    // 캐시 무효화 전략과 분산 캐시 고려가 필요합니다. 이 부분은 팀원과 스키마 변경 공유가 필요합니다.
+    private final java.util.concurrent.ConcurrentHashMap<Long, DashboardTimelineResponse> timelineCache = new java.util.concurrent.ConcurrentHashMap<>();
+    private final java.util.concurrent.ConcurrentHashMap<Long, java.time.LocalDateTime> timelineCacheVirtualNow = new java.util.concurrent.ConcurrentHashMap<>();
+
     /**
      * 발전소 대시보드 조회
      */
@@ -81,6 +87,17 @@ public class DashboardService {
                 : timelineRange.defaultFutureHours();
         LocalDateTime forecastEnd = windowEnd.plusHours(resolvedFutureHours);
 
+        // 캐시 체크: 시뮬레이션의 마지막 tick 시점(lastTickAt)을 기준으로 캐시 갱신 여부 판단
+        java.time.LocalDateTime lastTick = simulationService.getLastTickAt();
+        DashboardTimelineResponse cached = timelineCache.get(powerPlantId);
+        java.time.LocalDateTime cachedVirtualNow = timelineCacheVirtualNow.get(powerPlantId);
+
+        if (cached != null && cachedVirtualNow != null && lastTick != null && !lastTick.isAfter(cachedVirtualNow)) {
+            // 시뮬레이션이 전진하지 않았다면 캐시된 응답 반환
+            return cached;
+        }
+
+        // 실제 DB 조회 (초기 1회 또는 시뮬레이션이 전진했을 때만 수행)
         List<PlantFeatureLog> actualLogs = plantFeatureLogRepository
                 .findByPowerPlantIdAndMeasuredAtBetweenOrderByMeasuredAtAsc(powerPlantId, windowStart, windowEnd);
         List<PlantFeatureLog> predictionLogs = plantFeatureLogRepository
@@ -121,7 +138,7 @@ public class DashboardService {
                         .build())
                 .toList();
 
-        return DashboardTimelineResponse.builder()
+        DashboardTimelineResponse response = DashboardTimelineResponse.builder()
                 .plantId(powerPlantId)
                 .range(timelineRange.name())
                 .virtualNow(virtualNow)
@@ -133,6 +150,12 @@ public class DashboardService {
                 .gapSeries(gapSeries)
                 .anomalyMarkers(anomalyMarkers)
                 .build();
+
+        // 캐시에 저장
+        timelineCache.put(powerPlantId, response);
+        timelineCacheVirtualNow.put(powerPlantId, lastTick != null ? lastTick : virtualNow);
+
+        return response;
     }
 
     private GapPointDto toGapPoint(PlantFeatureLog log) {

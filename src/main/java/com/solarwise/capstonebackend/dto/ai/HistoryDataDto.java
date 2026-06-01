@@ -41,5 +41,36 @@ public class HistoryDataDto {
     @JsonProperty("humidity")
     private Double humidity; // 습도 (%)
 
+    @JsonProperty("dust_coverage_ratio")
+    private Double dustCoverageRatio;
+
+    @JsonProperty("snow_coverage_ratio")
+    private Double snowCoverageRatio;
+
+    @JsonProperty("bird_dropping_count")
+    private Integer birdDroppingCount;
+
+    @JsonProperty("physical_damage_count")
+    private Integer physicalDamageCount;
+
+    @JsonProperty("max_defect_confidence")
+    private Double maxDefectConfidence;
+
+    @JsonProperty("cls_normal")
+    private Integer clsNormal;
+
+    @JsonProperty("cls_dust")
+    private Integer clsDust;
+
+    @JsonProperty("cls_snow")
+    private Integer clsSnow;
+
+    @JsonProperty("cls_bird")
+    private Integer clsBird;
+
+    @JsonProperty("cls_damage")
+    private Integer clsDamage;
+
+
 }
 

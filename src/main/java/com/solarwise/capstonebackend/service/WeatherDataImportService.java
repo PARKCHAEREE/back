@@ -26,8 +26,7 @@ import java.util.Map;
 
 /**
  * CSV 데이터 임포트 서비스
- * - 우양 제공 CSV 파일을 파싱하여 PlantFeatureLog 엔티티로 변환하여 DB 적재
- * - 원본 CSV의 7개 파생 변수(TIME, ACTUAL, PREDICTION, TEMP, HUMI, CLOU, IRRADIANCE)를 보존
+ * - 우양 제공 31개 피처 CSV 파일을 파싱하여 PlantFeatureLog 엔티티로 변환하여 DB 적재
  */
 @Slf4j
 @Service
@@ -37,15 +36,6 @@ public class WeatherDataImportService {
     private final PlantFeatureLogRepository plantFeatureLogRepository;
     private final PowerPlantRepository powerPlantRepository;
 
-    /**
-     * 우양 제공 태양광/기상 데이터 CSV를 파싱하여 PlantFeatureLog로 적재합니다.
-     *
-     * @param powerPlantId 데이터를 적재할 발전소의 ID
-     * @param file 업로드된 CSV 파일
-     * @param enableDemoCheat 캡스톤 시연용 가짜 이상 탐지 조작 활성화 여부
-     * @return 성공 및 실패 건수를 포함한 처리 결과 Map
-     * @throws BusinessException CSV 파싱 실패 또는 발전소를 찾을 수 없을 경우
-     */
     @Transactional
     public Map<String, Object> importAdvisorCsvToEnergyLog(Long powerPlantId, MultipartFile file, boolean enableDemoCheat) {
         if (file.isEmpty()) {
@@ -63,7 +53,6 @@ public class WeatherDataImportService {
             throw new BusinessException("CSV 파일 파싱 중 오류가 발생했습니다: " + e.getMessage(), HttpStatus.BAD_REQUEST);
         }
 
-        // 🔑 PlantFeatureLog 리스트만 사용 (EnergyLog, WeatherData 제거)
         List<PlantFeatureLog> featureLogList = new ArrayList<>();
         int successCount = 0;
         int failureCount = 0;
@@ -75,24 +64,56 @@ public class WeatherDataImportService {
                 String rawTime = csvDto.getTime().trim();
                 LocalDateTime timestamp = LocalDateTime.parse(rawTime, formatter);
 
-                // 캡스톤 시연용 가짜 이상 탐지 조작: 2026-03-15 13:00 이후 실제 발전량을 40%로 깎음
+                // 캡스톤 시연용 가짜 이상 탐지 조작
                 Double actualValue = csvDto.getActual() != null ? csvDto.getActual() : 0.0;
                 if (enableDemoCheat && timestamp.isAfter(LocalDateTime.of(2026, 3, 15, 13, 0))) {
-                    actualValue *= 0.4; // 13시 이후부터 이상 발생 시작!
+                    actualValue *= 0.4;
                     log.debug("데모 조작 적용: {} → {} (40%로 감소)", csvDto.getActual(), actualValue);
                 }
 
-                // PlantFeatureLog 엔티티 빌드 (CSV의 7개 컬럼 매핑)
+                // PlantFeatureLog 엔티티 빌드 (31개 피처 매핑)
                 PlantFeatureLog featureLog = PlantFeatureLog.builder()
                         .powerPlantId(powerPlantId)
-                        .measuredAt(timestamp)                                      // TIME
-                        .actual(actualValue)                                        // ACTUAL (조작 여부 포함)
-                        .prediction(csvDto.getPrediction() != null ? csvDto.getPrediction() : 0.0)  // PREDICTION
-                        .temp(csvDto.getTemp() != null ? csvDto.getTemp() : 0.0)   // TEMP
-                        .humi(csvDto.getHumi() != null ? csvDto.getHumi() : 0.0)   // HUMI
-                        .clou(csvDto.getClou() != null ? csvDto.getClou() : 0.0)   // CLOU
-                        .irradiance(csvDto.getIrradiance() != null ? csvDto.getIrradiance() : 0.0)  // IRRADIANCE
-                        .wisp(0.0)                                                  // WISP (CSV에 없음, 풍속 기본값 0.0)
+                        .measuredAt(timestamp)
+                        // 1. 기본 발전량 데이터
+                        .actual(actualValue)
+                        .prediction(csvDto.getPrediction() != null ? csvDto.getPrediction() : 0.0)
+                        // 2. 기상/환경 변수
+                        .temp(csvDto.getTemp() != null ? csvDto.getTemp() : 0.0)
+                        .humi(csvDto.getHumi() != null ? csvDto.getHumi() : 0.0)
+                        .clou(csvDto.getClou() != null ? csvDto.getClou() : 0.0)
+                        .wisp(csvDto.getWisp() != null ? csvDto.getWisp() : 0.0)
+                        // 3. 시간 및 계절성 파생 변수
+                        .hSin(csvDto.getHSin() != null ? csvDto.getHSin() : 0.0)
+                        .hCos(csvDto.getHCos() != null ? csvDto.getHCos() : 0.0)
+                        .doySin(csvDto.getDoySin() != null ? csvDto.getDoySin() : 0.0)
+                        .doyCos(csvDto.getDoyCos() != null ? csvDto.getDoyCos() : 0.0)
+                        .wideSin(csvDto.getWideSin() != null ? csvDto.getWideSin() : 0.0)
+                        .wideCos(csvDto.getWideCos() != null ? csvDto.getWideCos() : 0.0)
+                        // 4. 일사량 및 발전소 용량 변수
+                        .sunElevClip(csvDto.getSunElevClip() != null ? csvDto.getSunElevClip() : 0.0)
+                        .cosZen(csvDto.getCosZen() != null ? csvDto.getCosZen() : 0.0)
+                        .irradiance(csvDto.getIrradiance() != null ? csvDto.getIrradiance() : 0.0)
+                        .estIrradiance(csvDto.getEstIrradiance() != null ? csvDto.getEstIrradiance() : 0.0)
+                        .irradianceProxy(csvDto.getIrradianceProxy() != null ? csvDto.getIrradianceProxy() : 0.0)
+                        .irradianceXCapa(csvDto.getIrradianceXCapa() != null ? csvDto.getIrradianceXCapa() : 0.0)
+                        .capa(csvDto.getCapa() != null ? csvDto.getCapa() : 0.0)
+                        // 5. 발전량 패턴 및 과거 시계열
+                        .seasonalSolarPattern(csvDto.getSeasonalSolarPattern() != null ? csvDto.getSeasonalSolarPattern() : 0.0)
+                        .weatherAdjustedPattern(csvDto.getWeatherAdjustedPattern() != null ? csvDto.getWeatherAdjustedPattern() : 0.0)
+                        .expectedGenProxy(csvDto.getExpectedGenProxy() != null ? csvDto.getExpectedGenProxy() : 0.0)
+                        .genLag2(csvDto.getGenLag2() != null ? csvDto.getGenLag2() : 0.0)
+                        // 6. 이상 탐지 관련 신규 피처
+                        .dustCoverageRatio(csvDto.getDustCoverageRatio() != null ? csvDto.getDustCoverageRatio() : 0.0)
+                        .snowCoverageRatio(csvDto.getSnowCoverageRatio() != null ? csvDto.getSnowCoverageRatio() : 0.0)
+                        .birdDroppingCount(csvDto.getBirdDroppingCount() != null ? csvDto.getBirdDroppingCount() : 0)
+                        .physicalDamageCount(csvDto.getPhysicalDamageCount() != null ? csvDto.getPhysicalDamageCount() : 0)
+                        .maxDefectConfidence(csvDto.getMaxDefectConfidence() != null ? csvDto.getMaxDefectConfidence() : 0.0)
+                        .clsNormal(csvDto.getClsNormal() != null ? csvDto.getClsNormal() : 0)
+                        .clsDust(csvDto.getClsDust() != null ? csvDto.getClsDust() : 0)
+                        .clsSnow(csvDto.getClsSnow() != null ? csvDto.getClsSnow() : 0)
+                        .clsBird(csvDto.getClsBird() != null ? csvDto.getClsBird() : 0)
+                        .clsDamage(csvDto.getClsDamage() != null ? csvDto.getClsDamage() : 0)
                         .build();
 
                 featureLogList.add(featureLog);
@@ -110,13 +131,8 @@ public class WeatherDataImportService {
             }
         }
 
-        // 성공한 데이터만 DB에 적재
         if (!featureLogList.isEmpty()) {
-            // 🔑 중복 방지: 해당 발전소의 기존 피처 로그 데이터 모두 삭제
             plantFeatureLogRepository.deleteByPowerPlantId(powerPlantId);
-            log.info("기존 피처 로그 삭제 완료 - 발전소 ID: {}", powerPlantId);
-
-            // 새로운 CSV 데이터를 PlantFeatureLog로 저장
             plantFeatureLogRepository.saveAll(featureLogList);
             log.info("PlantFeatureLog 적재 완료! 발전소 ID: {}, 저장: {}건, 실패: {}건", powerPlantId, featureLogList.size(), failureCount);
         } else {
@@ -130,14 +146,6 @@ public class WeatherDataImportService {
         );
     }
 
-    /**
-     * CSV 파일을 파싱하여 AdvisorDataCsvDto 리스트로 변환합니다.
-     * OpenCSV 라이브러리를 사용하여 @CsvBindByName 어노테이션 기반의 자동 매핑을 수행합니다.
-     *
-     * @param file 업로드된 CSV 파일
-     * @return 파싱된 DTO 리스트
-     * @throws Exception 파일 읽기 또는 파싱 실패 시
-     */
     private List<AdvisorDataCsvDto> parseCsvFile(MultipartFile file) throws Exception {
         try (Reader reader = new BufferedReader(new InputStreamReader(file.getInputStream(), "UTF-8"))) {
             List<AdvisorDataCsvDto> csvDataList = new CsvToBeanBuilder<AdvisorDataCsvDto>(reader)
@@ -151,7 +159,6 @@ public class WeatherDataImportService {
                 throw new BusinessException("CSV 파일에 데이터가 없습니다.", HttpStatus.BAD_REQUEST);
             }
 
-            log.info("CSV 파일 파싱 성공: {}건의 행 읽음", csvDataList.size());
             return csvDataList;
 
         } catch (BusinessException e) {
@@ -161,5 +168,4 @@ public class WeatherDataImportService {
             throw new BusinessException("CSV 파일 파싱 중 오류가 발생했습니다.", HttpStatus.BAD_REQUEST);
         }
     }
-
 }
