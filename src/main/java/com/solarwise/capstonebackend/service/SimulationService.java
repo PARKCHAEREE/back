@@ -15,6 +15,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import com.solarwise.capstonebackend.repository.VisionAnalysisRepository;
 import com.solarwise.capstonebackend.entity.VisionAnalysis;
@@ -43,6 +45,9 @@ public class SimulationService {
 
     // 마지막 tick 시점(가상 시간 기준)
     private volatile LocalDateTime lastTickAt;
+
+    // 메일 발송 여부를 메모리에 기록하여 중복 발송을 방지합니다.
+    private final Set<Long> notifiedAnomalyIds = ConcurrentHashMap.newKeySet();
 
     private final PowerPlantRepository powerPlantRepository;
     private final AnomalyRepository anomalyRepository;
@@ -199,7 +204,7 @@ public class SimulationService {
 
         // Lazy Loading 에러 방지: 이메일을 미리 추출한 후 전달
         String ownerEmail = plant.getUser().getEmail();
-        notificationService.sendAnomalyAlert(saved, ownerEmail);
+        notificationService.sendAnomalyAlert(ownerEmail, saved);
 
         return saved;
     }
@@ -229,6 +234,27 @@ public class SimulationService {
             log.debug("정상 패널 이미지 분석 수행");
             // TODO: AiIntegrationService.detectVisionAnomaly 호출 (정상 이미지)
             // detectVisionAnomaly(plantId, "PANEL_001", normalImageBase64);
+        }
+
+        // 시뮬레이션 시간 진행 후, 감지시점이 지난 OPEN 상태의 이상 이벤트를 확인하여
+        // HIGH 등급이면 소유자에게 이메일을 발송합니다. DB 상태(status)는 절대 변경하지 않습니다.
+        try {
+            List<Anomaly> dueAnomalies = anomalyRepository.findByDetectedAtLessThanEqualAndStatus(virtualCurrentTime, "OPEN");
+            for (Anomaly a : dueAnomalies) {
+                if (a != null && "HIGH".equals(a.getSeverity()) && !notifiedAnomalyIds.contains(a.getId())) {
+                    // 트랜잭션 경계 내에서 소유자 이메일을 안전하게 추출
+                    String ownerEmail = a.getPowerPlant() != null && a.getPowerPlant().getUser() != null
+                            ? a.getPowerPlant().getUser().getEmail() : null;
+                    if (ownerEmail != null && !ownerEmail.isEmpty()) {
+                        notificationService.sendAnomalyAlert(ownerEmail, a);
+                        // DB 상태를 변경하지 않고 메모리에 발송 여부만 기록
+                        notifiedAnomalyIds.add(a.getId());
+                        log.info("Sent notification for anomaly ID {} and recorded in-memory as notified", a.getId());
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.error("Error while processing due anomalies on tick: {}", e.getMessage(), e);
         }
     }
 

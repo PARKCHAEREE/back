@@ -77,3 +77,76 @@ Content-Type: application/json
 4. `ACKNOWLEDGED -> RESOLVED` 수동 전환 시연
 5. `playback/stop`으로 마무리
 
+## 7) 프론트엔드 전달용 API 연동 가이드
+---
+
+#### 🚨 버튼 1. 발전량 급락 시뮬레이션 (긴급 알림 발송 O)
+
+* **API:** `POST /api/v1/simulation/trigger-power-anomaly`
+* **설명:** 발전량이 40% 이상 급락하여 대시보드에 빨간색 경고가 뜨고, 즉시 이메일 알림이 발송되는 시연입니다.
+* **Request Body:**
+
+```json
+{
+  "plantId": 1,
+  "anomalySeverity": "HIGH",
+  "differencePercentage": 42.0,
+  "durationHours": 2
+}
+
+```
+
+#### ⚠️ 버튼 2. 발전량 저하 시뮬레이션 (단순 경고, 알림 발송 X)
+
+* **API:** `POST /api/v1/simulation/trigger-power-anomaly`
+* **설명:** 발전량이 15~29% 사이로 저하되어 대시보드에 노란색 경고만 뜨고 이메일은 발송되지 않는 시연입니다.
+* **Request Body:**
+
+```json
+{
+  "plantId": 1,
+  "anomalySeverity": "MEDIUM",
+  "differencePercentage": 18.0,
+  "durationHours": 2
+}
+
+```
+
+#### 📸 버튼 3. 패널 크랙 감지 (비전 AI - 긴급 알림 O)
+
+* **API:** `POST /api/v1/simulation/trigger-vision-anomaly`
+* **설명:** 드론이 패널의 파손(크랙)을 발견한 상황입니다. 높은 신뢰도로 판정되어 이메일 알림이 발송됩니다.
+* **Request Body:**
+
+```json
+{
+  "plantId": 1,
+  "anomalyType": "CRACK",
+  "confidence": 0.94,
+  "imageUrl": "http://localhost:8080/images/crack.jpg", 
+  "xaiExplanation": "외부 충격으로 인한 선형 크랙 감지 (우측 상단 모서리)"
+}
+
+```
+
+*(※ imageUrl은 제가 백엔드 서버에 사진 넣고 띄운 임시 로컬 주소입니다. 배포 시 도메인으로 바뀔 예정이니 일단 이대로 넣어주세요!)*
+
+#### 🧹 버튼 4. 패널 오염 감지 (비전 AI - 단순 경고)
+
+* **API:** `POST /api/v1/simulation/trigger-vision-anomaly`
+* **설명:** 드론이 패널의 단순 오염(새똥, 먼지 등)을 발견한 상황입니다. 유지보수 권장 수준이라 이메일은 가지 않습니다.
+* **Request Body:**
+
+```json
+{
+  "plantId": 1,
+  "anomalyType": "DIRT",
+  "confidence": 0.75,
+  "imageUrl": "http://localhost:8080/images/pollution.jpg",
+  "xaiExplanation": "패널 하단부 조류 분변 및 먼지 누적 감지"
+}
+
+```
+
+---
+

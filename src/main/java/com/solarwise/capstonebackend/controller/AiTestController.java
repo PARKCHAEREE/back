@@ -23,14 +23,12 @@ public class AiTestController {
     // 스웨거에서 이 버튼을 누르면 코랩의 /internal/anomaly/vision-detect 주소로 신호가 날아갑니다!
     @PostMapping("/vision/{plantId}")
     public ResponseEntity<String> testVisionDetection(@PathVariable Long plantId) {
-
-        // 💡 테스트용 가짜 데이터(패널 ID와 더미 이미지 텍스트)를 넣어서 코랩을 찌릅니다.
         String dummyPanelId = "PANEL_001";
-        String dummyBase64Image = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="; // 1픽셀짜리 가짜 이미지 데이터
 
-        // 비동기(@Async)로 패널 결함 분석 서비스를 호출합니다.
-        aiIntegrationService.detectVisionAnomaly(plantId, dummyPanelId, dummyBase64Image);
+        // src/main/resources/images/crack.jpg 파일을 읽어서 Base64 텍스트로 변환함
+        String realImageBase64 = aiIntegrationService.encodeImageToBase64("crack.jpg");
 
-        return ResponseEntity.ok("YOLO 패널 결함 분석 요청이 백그라운드에서 시작되었습니다! (코랩 창과 인텔리제이 콘솔 로그를 확인하세요)");
+        aiIntegrationService.detectVisionAnomaly(plantId, dummyPanelId, realImageBase64);
+        return ResponseEntity.ok("진짜 크랙 사진으로 YOLO 분석 요청을 보냈습니다!");
     }
 }
