@@ -1,8 +1,8 @@
-# 백엔드 API 구현 현황 (2026-05-18 UPDATE)
+# 백엔드 API 구현 현황 (2026-06-01 UPDATE)
 
 ## 📊 핵심 진행도
-- **전체 진행률**: Phase 5 완료 (98%) → P0 과제 100% 달성
-- **빌드 상태**: ✅ BUILD SUCCESSFUL (0 컴파일 오류)
+- **전체 진행률**: Phase 5 완료, Phase 6 진행 중 (약 75%) — 전체 진행률 약 98~99%
+- **빌드 상태**: 컴파일 성공, 단위/통합 테스트: 일부 실패(1) — ApplicationContext 로드 실패(테스트 환경에 `JavaMailSender` 빈 없음)
 - **데이터 모델**: ✅ PlantFeatureLog 통합 (3개 테이블 → 1개 테이블)
 - **AI 연동**: ✅ 비동기 처리 완료 (CompletableFuture)
 - **가상 시간 아키텍처**: ✅ 100% 준수 (모든 파일 검수 완료)
@@ -187,6 +187,8 @@ Caused by: org.springframework.beans.factory.NoSuchBeanDefinitionException: No q
 - [ ] 배치 스케줄러 구현 (EnergyAggregationService 시간별/일별 집계)
 - [ ] 대용량 데이터 스트레스 테스트 (1개월 이상 데이터)
 - [ ] RDS 쿼리 최적화 (복합 인덱스, 쿼리 플랜 분석)
+ - [ ] 테스트 환경 안정화: `JavaMailSender` 테스트용 빈(`@TestConfiguration`) 추가 및 전체 테스트 재실행
+ - [ ] 메일 중복 발송 상태 영속화 검토: 현재 인메모리(`notifiedAnomalyIds`) 사용으로 데몬 재시작 시 초기화됨 — Redis/DB 설계 여부 결정
 
 ### AI/데이터 연동 영역 (박채리)
 
@@ -197,6 +199,8 @@ Caused by: org.springframework.beans.factory.NoSuchBeanDefinitionException: No q
 - 🔄 비전 이상 시뮬레이션 API 개발 (이미지 URL 기반 CRACK/DIRT 생성)
 - 🔄 이메일 알림 연동 (JavaMailSender 활용 HIGH 등급 자동 발송)
 - 🔄 에너지 데이터 집계 배치 스케줄러 개발 (시간/일/월 단위 Aggregation)
+ - [ ] 알림 수신자 매핑 설계: 발전소별 수신자(소유자/운영자) 필드/권한 모델 확정
+ - [ ] `notifiedAnomalyIds`의 영속화 방안 결정 및 구현(필요시 Redis 도입)
 
 ## 파일 구조
 
