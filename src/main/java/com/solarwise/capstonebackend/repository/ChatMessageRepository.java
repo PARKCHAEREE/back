@@ -8,8 +8,5 @@ import java.util.List;
 
 @Repository
 public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> {
-
-    // 세션 ID로 소속된 메시지 목록을 생성일시 오름차순으로 조회
-    List<ChatMessage> findByChatSessionIdOrderByCreatedAtAsc(Long chatSessionId);
+    List<ChatMessage> findByChatSessionIdOrderByCreatedAtAsc(String sessionId);
 }
-

@@ -15,10 +15,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
 
-/**
- * 시뮬레이션 컨트롤러
- * - 가상 시간 기반 시뮬레이션 제어 API를 제공합니다.
- */
 @Tag(name = "Simulation API", description = "가상 시간 기반 시뮬레이션 제어")
 @RestController
 @RequestMapping("/api/v1/simulation")
@@ -27,11 +23,6 @@ public class SimulationController {
 
     private final SimulationService simulationService;
 
-    /**
-     * 현재 가상 시간을 조회합니다.
-     *
-     * @return 가상 현재 시간
-     */
     @Operation(summary = "가상 현재 시간 조회")
     @GetMapping("/time")
     @PreAuthorize("isAuthenticated()")
@@ -40,11 +31,6 @@ public class SimulationController {
         return ResponseEntity.ok(ApiResponse.success(currentTime, "가상 현재 시간 조회 성공"));
     }
 
-    /**
-     * 가상 시간을 1시간 앞으로 땡깁니다.
-     *
-     * @return 업데이트된 가상 시간
-     */
     @Operation(summary = "가상 시간 1시간 전진 (백업용 수동 스텝)")
     @PostMapping("/tick")
     @PreAuthorize("hasRole('ADMIN')")
@@ -77,11 +63,6 @@ public class SimulationController {
         return ResponseEntity.ok(ApiResponse.success(buildPlaybackStatus(), "시뮬레이션 자동 재생 상태 조회 성공"));
     }
 
-    /**
-     * 드론 에러 트리거를 설정합니다.
-     *
-     * @return 트리거 설정 결과
-     */
     @Operation(summary = "드론 에러 트리거 설정")
     @PostMapping("/trigger-drone-error")
     @PreAuthorize("hasRole('ADMIN')")
@@ -95,20 +76,7 @@ public class SimulationController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<AnomalyDto>> triggerPowerAnomaly(@RequestBody PowerAnomalyTriggerRequest request) {
         Anomaly anomaly = simulationService.triggerPowerAnomaly(request);
-
-        AnomalyDto dto = AnomalyDto.builder()
-                .eventId(anomaly.getId())
-                .type(anomaly.getType())
-                .severity(anomaly.getSeverity())
-                .detectedAt(anomaly.getDetectedAt())
-                .summary(anomaly.getSummary())
-                .status(anomaly.getStatus())
-                .cause(anomaly.getCause())
-                .recommendedAction(anomaly.getRecommendedAction())
-                .xaiExplanation(anomaly.getXaiExplanation())
-                .build();
-
-        return ResponseEntity.ok(ApiResponse.success(dto, "발전량 이상 시뮬레이션 트리거 생성됨"));
+        return ResponseEntity.ok(ApiResponse.success(toAnomalyDto(anomaly), "발전량 이상 시뮬레이션 트리거 생성됨"));
     }
 
     @Operation(summary = "시뮬레이션: 비전 이상 트리거")
@@ -116,20 +84,7 @@ public class SimulationController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<AnomalyDto>> triggerVisionAnomaly(@RequestBody com.solarwise.capstonebackend.dto.VisionAnomalyTriggerRequest request) {
         Anomaly anomaly = simulationService.triggerVisionAnomaly(request);
-
-        AnomalyDto dto = AnomalyDto.builder()
-                .eventId(anomaly.getId())
-                .type(anomaly.getType())
-                .severity(anomaly.getSeverity())
-                .detectedAt(anomaly.getDetectedAt())
-                .summary(anomaly.getSummary())
-                .status(anomaly.getStatus())
-                .cause(anomaly.getCause())
-                .recommendedAction(anomaly.getRecommendedAction())
-                .xaiExplanation(anomaly.getXaiExplanation())
-                .build();
-
-        return ResponseEntity.ok(ApiResponse.success(dto, "비전 이상 시뮬레이션 트리거 생성됨"));
+        return ResponseEntity.ok(ApiResponse.success(toAnomalyDto(anomaly), "비전 이상 시뮬레이션 트리거 생성됨"));
     }
 
     private SimulationPlaybackStatusDto buildPlaybackStatus() {
@@ -139,6 +94,20 @@ public class SimulationController {
                 .stepHours(simulationService.getPlaybackStepHours())
                 .virtualCurrentTime(simulationService.getVirtualCurrentTime())
                 .lastTickAt(simulationService.getLastTickAt())
+                .build();
+    }
+
+    private AnomalyDto toAnomalyDto(Anomaly anomaly) {
+        return AnomalyDto.builder()
+                .eventId(anomaly.getId())
+                .type(anomaly.getType())
+                .severity(anomaly.getSeverity())
+                .detectedAt(anomaly.getDetectedAt())
+                .summary(anomaly.getSummary())
+                .status(anomaly.getStatus())
+                .cause(anomaly.getCause())
+                .recommendedAction(anomaly.getRecommendedAction())
+                .xaiExplanation(anomaly.getXaiExplanation())
                 .build();
     }
 }

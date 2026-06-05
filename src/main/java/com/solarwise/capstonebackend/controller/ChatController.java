@@ -3,96 +3,66 @@ package com.solarwise.capstonebackend.controller;
 import com.solarwise.capstonebackend.dto.ApiResponse;
 import com.solarwise.capstonebackend.dto.chat.ChatMessageRequest;
 import com.solarwise.capstonebackend.dto.chat.ChatMessageResponse;
+import com.solarwise.capstonebackend.dto.chat.ChatSessionRequest;
 import com.solarwise.capstonebackend.dto.chat.ChatSessionResponse;
+import com.solarwise.capstonebackend.entity.ChatMessage;
 import com.solarwise.capstonebackend.service.ChatService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
+@Tag(name = "Chat", description = "이상 원인 설명 챗 API")
 @RestController
-@RequestMapping("/api/v1/plants")
+@RequestMapping("/api/v1/plants/{plantId}/chat/sessions")
 @RequiredArgsConstructor
 public class ChatController {
 
     private final ChatService chatService;
 
-    /**
-     * POST /api/v1/plants/{plantId}/chat/sessions
-     * 새로운 채팅 세션 생성
-     */
-    @PostMapping("/{plantId}/chat/sessions")
+    @Operation(summary = "챗 세션 생성", description = "이상 이벤트를 기반으로 챗 세션을 시작합니다.")
+    @PostMapping
     public ResponseEntity<ApiResponse<ChatSessionResponse>> createSession(
             @PathVariable Long plantId,
-            @RequestParam String sessionTitle) {
-
-        ChatSessionResponse response = chatService.createSession(plantId, sessionTitle);
-
+            @RequestBody ChatSessionRequest request) {
+        ChatSessionResponse response = chatService.createSessionForEvent(plantId, request.getEventId());
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.<ChatSessionResponse>builder()
-                        .success(true)
-                        .data(response)
-                        .message("채팅 세션이 생성되었습니다.")
-                        .build());
+                .body(ApiResponse.success(response, "챗 세션이 생성되었습니다."));
     }
 
-    /**
-     * GET /api/v1/plants/{plantId}/chat/sessions
-     * 해당 발전소의 모든 채팅 세션 조회 (최신순)
-     */
-    @GetMapping("/{plantId}/chat/sessions")
-    public ResponseEntity<ApiResponse<List<ChatSessionResponse>>> getSessions(
-            @PathVariable Long plantId) {
-
-        List<ChatSessionResponse> responses = chatService.getSessionsByPlant(plantId);
-
-        return ResponseEntity.ok()
-                .body(ApiResponse.<List<ChatSessionResponse>>builder()
-                        .success(true)
-                        .data(responses)
-                        .message("채팅 세션 목록을 조회했습니다.")
-                        .build());
-    }
-
-    /**
-     * GET /api/v1/plants/{plantId}/chat/sessions/{sessionId}/messages
-     * 특정 세션의 이전 메시지 내역 조회 (생성일시 오름차순)
-     */
-    @GetMapping("/{plantId}/chat/sessions/{sessionId}/messages")
-    public ResponseEntity<ApiResponse<List<ChatMessageResponse>>> getMessages(
-            @PathVariable Long plantId,
-            @PathVariable Long sessionId) {
-
-        List<ChatMessageResponse> responses = chatService.getMessages(sessionId);
-
-        return ResponseEntity.ok()
-                .body(ApiResponse.<List<ChatMessageResponse>>builder()
-                        .success(true)
-                        .data(responses)
-                        .message("메시지 내역을 조회했습니다.")
-                        .build());
-    }
-
-    /**
-     * POST /api/v1/plants/{plantId}/chat/sessions/{sessionId}/messages
-     * 메시지 전송 (사용자 메시지 저장 + 더미 AI 응답)
-     */
-    @PostMapping("/{plantId}/chat/sessions/{sessionId}/messages")
+    @Operation(summary = "챗 메시지 전송", description = "원인 설명 챗에 질문을 전송하고 AI의 답변을 받습니다.")
+    @PostMapping("/{sessionId}/messages")
     public ResponseEntity<ApiResponse<ChatMessageResponse>> sendMessage(
             @PathVariable Long plantId,
-            @PathVariable Long sessionId,
+            @PathVariable String sessionId,
             @RequestBody ChatMessageRequest request) {
-
         ChatMessageResponse response = chatService.sendMessage(sessionId, request);
+        return ResponseEntity.ok(ApiResponse.success(response, "답변 생성 성공"));
+    }
 
-        return ResponseEntity.ok()
-                .body(ApiResponse.<ChatMessageResponse>builder()
-                        .success(true)
-                        .data(response)
-                        .message("메시지가 전송되었습니다.")
-                        .build());
+    @Operation(summary = "[참고] 해당 발전소의 모든 채팅 세션 조회", description = "특정 발전소의 모든 채팅 세션 목록을 최신순으로 조회합니다.")
+    @GetMapping
+    public ResponseEntity<ApiResponse<List<ChatSessionResponse>>> getSessions(@PathVariable Long plantId) {
+        List<ChatSessionResponse> responses = chatService.getSessionsByPlant(plantId);
+        return ResponseEntity.ok(ApiResponse.success(responses, "채팅 세션 목록을 조회했습니다."));
+    }
+
+    @Operation(summary = "[참고] 특정 세션의 이전 메시지 내역 조회", description = "특정 세션의 모든 메시지 기록을 시간순으로 조회합니다.")
+    @GetMapping("/{sessionId}/messages")
+    public ResponseEntity<ApiResponse<List<ChatMessageResponse>>> getMessages(
+            @PathVariable Long plantId,
+            @PathVariable String sessionId) {
+        List<ChatMessage> rawMessages = chatService.getMessagesBySessionId(sessionId);
+        List<ChatMessageResponse> responses = rawMessages.stream()
+                .map(msg -> ChatMessageResponse.builder()
+                        .answer(msg.getContent())
+                        .build())
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(ApiResponse.success(responses, "메시지 내역을 조회했습니다."));
     }
 }
-
