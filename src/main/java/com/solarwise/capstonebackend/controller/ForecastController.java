@@ -1,34 +1,35 @@
 package com.solarwise.capstonebackend.controller;
 
-import com.solarwise.capstonebackend.dto.ai.AiPredictionResponse;
-import com.solarwise.capstonebackend.dto.ai.XaiExplanationResponse;
 import com.solarwise.capstonebackend.dto.ApiResponse;
-import com.solarwise.capstonebackend.service.AiIntegrationService;
-import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
-import io.swagger.v3.oas.annotations.tags.Tag;
+import com.solarwise.capstonebackend.dto.ForecastResponseDto;
+import com.solarwise.capstonebackend.service.ForecastService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
 
-@Tag(name = "Forecasts", description = "발전량 예측 및 XAI 관련 API")
+import java.time.LocalDateTime;
+
+@Tag(name = "Forecasts", description = "발전량 예측 API")
 @RestController
 @RequestMapping("/api/v1/plants/{plantId}/forecasts")
 @RequiredArgsConstructor
 public class ForecastController {
 
-    private final AiIntegrationService aiIntegrationService;
-    @Operation(summary = "발전량 예측 조회")
+    private final ForecastService forecastService;
+
+    @Operation(summary = "예측 발전량 조회", description = "향후 2~3일의 예측 발전량 데이터를 조회합니다.")
     @GetMapping
-    public ApiResponse<AiPredictionResponse> getForecast(@PathVariable Long plantId) {
-        AiPredictionResponse prediction = aiIntegrationService.requestPredictionFromAi(plantId).join();
-        return ApiResponse.success(prediction, "AI 예측 발전량 조회 성공");
+    public ResponseEntity<ApiResponse<ForecastResponseDto>> getForecasts(
+            @PathVariable Long plantId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to) {
+
+        ForecastResponseDto response = forecastService.getForecasts(plantId, from, to);
+        return ResponseEntity.ok(ApiResponse.success(response, "예측 데이터 조회 성공"));
     }
-    @Operation(summary = "예측 근거(XAI) 조회")
-    @GetMapping("/explanations")
-    public ApiResponse<XaiExplanationResponse> getForecastExplanation(@PathVariable Long plantId) {
-        XaiExplanationResponse explanation = aiIntegrationService.requestXaiExplanation(plantId).join();
-        return ApiResponse.success(explanation,"XAI 예측 설명 조회 성공");
-    }
+
+    // TODO: /explanations API 구현 필요
 }

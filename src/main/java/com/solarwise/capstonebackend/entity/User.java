@@ -33,7 +33,7 @@ public class User {
     @Column(length = 50)
     private String role; // ADMIN, MANAGER, USER
 
-    @Column(columnDefinition = "TINYINT(1) DEFAULT 1")
+    @Column
     private Boolean active;
 
     @Column(name = "created_at", nullable = false, updatable = false)

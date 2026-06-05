@@ -15,17 +15,10 @@ import org.springframework.web.servlet.NoHandlerFoundException;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * 전역 예외 처리 클래스
- * - @RestControllerAdvice를 사용한 일관된 에러 응답 처리
- */
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    /**
-     * 비즈니스 로직 예외 처리
-     */
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ApiErrorResponse> handleBusinessException(BusinessException ex, WebRequest request) {
         log.warn("비즈니스 예외 발생: {}", ex.getMessage());
@@ -35,9 +28,6 @@ public class GlobalExceptionHandler {
         );
     }
 
-    /**
-     * 리소스 없음 예외 처리
-     */
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<ApiErrorResponse> handleResourceNotFoundException(ResourceNotFoundException ex, WebRequest request) {
         log.warn("리소스 없음: {}", ex.getMessage());
@@ -47,9 +37,6 @@ public class GlobalExceptionHandler {
         );
     }
 
-    /**
-     * 필드 검증 예외 처리
-     */
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiErrorResponse> handleValidationException(MethodArgumentNotValidException ex, WebRequest request) {
         log.error("필드 검증 예외 발생");
@@ -70,9 +57,6 @@ public class GlobalExceptionHandler {
         );
     }
 
-    /**
-     * 권한 없음 예외 처리
-     */
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ApiErrorResponse> handleAccessDeniedException(AccessDeniedException ex, WebRequest request) {
         log.error("권한 없음 예외 발생: {}", ex.getMessage());
@@ -82,9 +66,6 @@ public class GlobalExceptionHandler {
         );
     }
 
-    /**
-     * 404 예외 처리
-     */
     @ExceptionHandler(NoHandlerFoundException.class)
     public ResponseEntity<ApiErrorResponse> handleNoHandlerFoundException(NoHandlerFoundException ex, WebRequest request) {
         log.error("404 에러: {}", ex.getRequestURL());
@@ -94,17 +75,14 @@ public class GlobalExceptionHandler {
         );
     }
 
-    /**
-     * 일반 예외 처리
-     */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiErrorResponse> handleGlobalException(Exception ex, WebRequest request) {
+        // 이 부분이 추가되었습니다. 어떤 설정이든 무조건 콘솔에 에러를 찍습니다.
+        ex.printStackTrace();
         log.error("예상치 못한 예외 발생", ex);
         return new ResponseEntity<>(
                 ApiErrorResponse.error("INTERNAL_SERVER_ERROR", "서버 오류가 발생했습니다."),
                 HttpStatus.INTERNAL_SERVER_ERROR
         );
     }
-
 }
-
