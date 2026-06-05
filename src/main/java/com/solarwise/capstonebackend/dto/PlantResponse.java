@@ -1,19 +1,13 @@
 package com.solarwise.capstonebackend.dto;
 
-import lombok.AllArgsConstructor;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.Builder;
 import lombok.Data;
-import lombok.NoArgsConstructor;
 
-/**
- * 발전소 응답 DTO
- */
 @Data
 @Builder
-@NoArgsConstructor
-@AllArgsConstructor
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class PlantResponse {
-
     private Long plantId;
     private String name;
     private String location;
@@ -21,6 +15,4 @@ public class PlantResponse {
     private String status;
     private String inverterModel;
     private String sensorSerialNumber;
-
 }
-

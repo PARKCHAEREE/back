@@ -1,24 +1,15 @@
 package com.solarwise.capstonebackend.dto.chat;
 
-import lombok.*;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import lombok.Builder;
+import lombok.Data;
 
-import java.time.LocalDateTime;
+import java.util.List;
 
-@Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
+@Data
 @Builder
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class ChatMessageResponse {
-
-    private Long messageId;
-
-    private String senderRole;
-
-    private String content;
-
-    private String imageUrl;
-
-    private LocalDateTime createdAt;
+    private String answer;
+    private List<String> references;
 }
-

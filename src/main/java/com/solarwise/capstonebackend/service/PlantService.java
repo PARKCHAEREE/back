@@ -13,15 +13,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
-/**
- * 발전소 서비스
- * - 발전소 조회 및 관리
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -31,9 +28,7 @@ public class PlantService {
     private final UserRepository userRepository;
     private final SimulationService simulationService;
 
-    /**
-     * 발전소 등록
-     */
+    @Transactional
     public PlantResponse createPlant(Long userId, CreatePlantRequest request) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("사용자를 찾을 수 없습니다."));
@@ -53,7 +48,6 @@ public class PlantService {
                 .latitude(request.getLatitude())
                 .longitude(request.getLongitude())
                 .status("ACTIVE")
-                .active(true)
                 .user(user)
                 .createdAt(virtualNow)
                 .updatedAt(virtualNow)
@@ -63,9 +57,7 @@ public class PlantService {
         return entityToResponse(savedPlant);
     }
 
-    /**
-     * 발전소 정보 수정
-     */
+    @Transactional
     public PlantResponse updatePlant(Long plantId, Long userId, UpdatePlantRequest request) {
         PowerPlant plant = powerPlantRepository.findByIdAndUserId(plantId, userId)
                 .orElseThrow(() -> new ResourceNotFoundException("발전소를 찾을 수 없습니다."));
@@ -89,9 +81,7 @@ public class PlantService {
         return entityToResponse(savedPlant);
     }
 
-    /**
-     * 발전소 삭제 (소프트 삭제)
-     */
+    @Transactional
     public void deletePlant(Long plantId, Long userId) {
         PowerPlant plant = powerPlantRepository.findByIdAndUserId(plantId, userId)
                 .orElseThrow(() -> new ResourceNotFoundException("발전소를 찾을 수 없습니다."));
@@ -104,9 +94,7 @@ public class PlantService {
         powerPlantRepository.save(plant);
     }
 
-    /**
-     * 사용자의 모든 발전소 조회
-     */
+    @Transactional(readOnly = true)
     public List<PlantResponse> getPlantsByUser(Long userId) {
         userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("사용자를 찾을 수 없습니다."));
@@ -117,9 +105,7 @@ public class PlantService {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * 발전소 상세 조회 (사용자 권한 확인)
-     */
+    @Transactional(readOnly = true)
     public PlantResponse getPlantDetail(Long plantId, Long userId) {
         PowerPlant plant = powerPlantRepository.findByIdAndUserId(plantId, userId)
                 .orElseThrow(() -> new ResourceNotFoundException("발전소를 찾을 수 없습니다."));
@@ -127,9 +113,6 @@ public class PlantService {
         return entityToResponse(plant);
     }
 
-    /**
-     * 엔티티를 응답 DTO로 변환
-     */
     private PlantResponse entityToResponse(PowerPlant plant) {
         return PlantResponse.builder()
                 .plantId(plant.getId())
@@ -141,6 +124,4 @@ public class PlantService {
                 .sensorSerialNumber(plant.getSensorSerialNumber())
                 .build();
     }
-
 }
-

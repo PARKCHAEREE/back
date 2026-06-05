@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * 발전소 고급 피처 로그 저장소
@@ -32,4 +33,6 @@ public interface PlantFeatureLogRepository extends JpaRepository<PlantFeatureLog
     void deleteByPowerPlantId(Long powerPlantId);
 
     PlantFeatureLog findTopByPowerPlantIdOrderByMeasuredAtDesc(Long powerPlantId);
+
+    java.util.Optional<PlantFeatureLog> findByPowerPlantIdAndMeasuredAt(Long powerPlantId, java.time.LocalDateTime measuredAt);
 }

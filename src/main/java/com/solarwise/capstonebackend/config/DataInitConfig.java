@@ -35,7 +35,7 @@ public class DataInitConfig {
                         .email("sass090023@gmail.com")
                         .password(passwordEncoder.encode("password123"))
                         .name("테스트관리자")
-                        .role("MANAGER")
+                        .role("ADMIN")
                         .active(true)
                         .createdAt(virtualNow)
                         .updatedAt(virtualNow)

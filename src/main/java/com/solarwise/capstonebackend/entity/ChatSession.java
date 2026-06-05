@@ -1,22 +1,23 @@
 package com.solarwise.capstonebackend.entity;
 
 import jakarta.persistence.*;
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "chat_sessions")
-@Getter
-@Setter
+@Data
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
 public class ChatSession {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    private String id;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "power_plant_id", nullable = false)
@@ -25,9 +26,11 @@ public class ChatSession {
     @Column(nullable = false)
     private String sessionTitle;
 
-    // 가상시간 주입을 위해 서비스 계층에서 수동 설정함 (JPA Auditing 사용 금지)
+    private Long relatedEventId;
+
+    @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    @Column(nullable = false)
     private LocalDateTime updatedAt;
 }
-
