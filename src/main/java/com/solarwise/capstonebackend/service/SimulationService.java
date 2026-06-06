@@ -5,13 +5,15 @@ import com.solarwise.capstonebackend.dto.VisionAnomalyTriggerRequest;
 import com.solarwise.capstonebackend.entity.Anomaly;
 import com.solarwise.capstonebackend.entity.PlantFeatureLog;
 import com.solarwise.capstonebackend.entity.PowerPlant;
-import com.solarwise.capstonebackend.entity.VisionAnalysis; // import 추가
+import com.solarwise.capstonebackend.entity.VisionAnalysis;
+import com.solarwise.capstonebackend.event.ForecastGenerationEvent;
 import com.solarwise.capstonebackend.repository.AnomalyRepository;
 import com.solarwise.capstonebackend.repository.PlantFeatureLogRepository;
 import com.solarwise.capstonebackend.repository.PowerPlantRepository;
 import com.solarwise.capstonebackend.repository.VisionAnalysisRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,9 +29,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
 @RequiredArgsConstructor
 public class SimulationService {
 
-    private static final int POWER_ANOMALY_DELAY_HOURS = 5;
-    private LocalDateTime virtualCurrentTime = LocalDateTime.of(2026, 3, 15, 13, 0);
-    private final AtomicBoolean triggerNextError = new AtomicBoolean(false);
+    private static final LocalDateTime SIMULATION_START_TIME = LocalDateTime.of(2025, 9, 25, 0, 0);
+    private static final LocalDateTime SIMULATION_END_TIME = LocalDateTime.of(2025, 11, 6, 23, 59);
+
+    private LocalDateTime virtualCurrentTime = SIMULATION_START_TIME;
     private final AtomicBoolean playbackRunning = new AtomicBoolean(false);
     private volatile LocalDateTime lastTickAt;
     private final Set<Long> notifiedAnomalyIds = ConcurrentHashMap.newKeySet();
@@ -39,20 +42,27 @@ public class SimulationService {
     private final PlantFeatureLogRepository plantFeatureLogRepository;
     private final NotificationService notificationService;
     private final VisionAnalysisRepository visionAnalysisRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     public synchronized LocalDateTime getVirtualCurrentTime() { return virtualCurrentTime; }
+
     public synchronized void advanceTimeByHour() {
-        virtualCurrentTime = virtualCurrentTime.plusHours(1);
+        // 💡 최종 수정: 시간 경계를 넘기 전에 확인하고 리셋하는 방식으로 변경
+        LocalDateTime nextTime = virtualCurrentTime.plusHours(1);
+        if (nextTime.isAfter(SIMULATION_END_TIME)) {
+            virtualCurrentTime = SIMULATION_START_TIME;
+            log.info("시뮬레이션 시간 초기화: {}", virtualCurrentTime);
+        } else {
+            virtualCurrentTime = nextTime;
+        }
         lastTickAt = virtualCurrentTime;
         log.info("가상 시간 1시간 전진: {}", virtualCurrentTime);
     }
+    
     public void startPlayback() { playbackRunning.set(true); log.info("시뮬레이션 자동 재생 시작"); }
     public void stopPlayback() { playbackRunning.set(false); log.info("시뮬레이션 자동 재생 정지"); }
     public boolean isPlaybackRunning() { return playbackRunning.get(); }
-    public int getPlaybackTickSeconds() { return 1; }
-    public int getPlaybackStepHours() { return 1; }
     public LocalDateTime getLastTickAt() { return lastTickAt; }
-    public void triggerDroneError() { triggerNextError.set(true); log.info("드론 에러 트리거 설정됨"); }
 
     @Transactional
     public Anomaly triggerPowerAnomaly(PowerAnomalyTriggerRequest request) {
@@ -61,7 +71,7 @@ public class SimulationService {
         LocalDateTime now = getVirtualCurrentTime();
         int durationHours = request.getDurationHours() == null ? 2 : Math.max(1, request.getDurationHours());
         double reductionFactor = Math.max(0.0, 1.0 - ((request.getDifferencePercentage() == null ? 30.0 : request.getDifferencePercentage()) / 100.0));
-        LocalDateTime anomalyStart = now.plusHours(POWER_ANOMALY_DELAY_HOURS);
+        LocalDateTime anomalyStart = now.plusHours(5);
         LocalDateTime anomalyEnd = anomalyStart.plusHours(durationHours - 1L);
 
         List<PlantFeatureLog> targetLogs = plantFeatureLogRepository.findByPowerPlantIdAndMeasuredAtBetweenOrderByMeasuredAtAsc(plant.getId(), anomalyStart, anomalyEnd);
@@ -105,6 +115,15 @@ public class SimulationService {
             notificationService.sendAnomalyAlert(ownerEmail, saved);
         }
         return saved;
+    }
+
+    @Scheduled(fixedRate = 3600000) // 1시간에 한번
+    public void generatePeriodicForecasts() {
+        log.info("주기적인 예측 데이터 생성을 위한 이벤트를 발행합니다...");
+        LocalDateTime forecastTime = getVirtualCurrentTime().plusHours(1);
+        powerPlantRepository.findAll().forEach(plant -> {
+            eventPublisher.publishEvent(new ForecastGenerationEvent(this, plant.getId(), forecastTime));
+        });
     }
 
     @Scheduled(fixedRate = 1000)

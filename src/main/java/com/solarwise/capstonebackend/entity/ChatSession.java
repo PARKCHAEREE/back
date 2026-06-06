@@ -17,7 +17,8 @@ import java.time.LocalDateTime;
 public class ChatSession {
 
     @Id
-    private String id;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id; // DB에 맞춰 Long 타입으로 복원
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "power_plant_id", nullable = false)

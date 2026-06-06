@@ -3,14 +3,10 @@ package com.solarwise.capstonebackend.entity;
 import jakarta.persistence.*;
 import lombok.*;
 
-/**
- * 이미지 분석 결과 엔티티
- * - AI 비전 모델의 패널 이미지 분석 결과
- */
+import java.time.LocalDateTime;
+
 @Entity
-@Table(name = "vision_analyses", indexes = {
-        @Index(name = "idx_vision_analyses_anomaly_id", columnList = "anomaly_id")
-})
+@Table(name = "vision_analyses")
 @Getter
 @Setter
 @Builder
@@ -23,20 +19,17 @@ public class VisionAnalysis {
     private Long id;
 
     @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "anomaly_id", nullable = false)
+    @JoinColumn(name = "anomaly_id", nullable = false, unique = true)
     private Anomaly anomaly;
 
     @Column(length = 500)
-    private String imageUrl; // 분석된 이미지 URL
+    private String imageUrl;
 
     @Column(length = 2000)
-    private String analysisResult; // AI 분석 결과 상세
+    private String analysisResult;
+
+    // heatmapUrl 필드를 제거하여 DB 스키마를 변경하지 않음
 
     @Column(name = "created_at", nullable = false, updatable = false)
-    private java.time.LocalDateTime createdAt;
-
-    @PrePersist
-    protected void onCreate() {
-        // 시간 설정은 Service 계층에서 수행 (SimulationService.getVirtualCurrentTime() 사용)
-    }
+    private LocalDateTime createdAt;
 }
