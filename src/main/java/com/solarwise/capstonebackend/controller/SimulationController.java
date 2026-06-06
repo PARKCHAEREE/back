@@ -4,6 +4,7 @@ import com.solarwise.capstonebackend.dto.ApiResponse;
 import com.solarwise.capstonebackend.dto.PowerAnomalyTriggerRequest;
 import com.solarwise.capstonebackend.dto.SimulationPlaybackStatusDto;
 import com.solarwise.capstonebackend.dto.VisionAnomalyTriggerRequest;
+import com.solarwise.capstonebackend.entity.Anomaly;
 import com.solarwise.capstonebackend.service.SimulationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -22,72 +23,21 @@ public class SimulationController {
 
     private final SimulationService simulationService;
 
-    // --- 시나리오 실행 버튼 API ---
-
-    @Operation(summary = "▶️ 시나리오 1: 발전량 급락 (긴급 알림 O)", description = "발전량이 42% 급락하여 즉시 이메일 알림이 발송되는 시나리오를 실행합니다.")
-    @PostMapping("/scenarios/power-high")
+    @Operation(summary = "▶️ 시나리오 1: 발전량 급락 (긴급 알림 O)")
+    @PostMapping("/trigger-power-anomaly")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<String>> triggerScenarioPowerHigh() {
-        PowerAnomalyTriggerRequest request = PowerAnomalyTriggerRequest.builder()
-                .plantId(1L)
-                .anomalySeverity("HIGH")
-                .differencePercentage(42.0)
-                .durationHours(2)
-                .description("시나리오 1: 인버터 장애로 인한 발전량 급락")
-                .build();
-        simulationService.triggerPowerAnomaly(request);
-        return ResponseEntity.ok(ApiResponse.success("시나리오 1 (발전량 급락)이 성공적으로 트리거되었습니다."));
+    public ResponseEntity<ApiResponse<Anomaly>> triggerPowerAnomaly(@RequestBody PowerAnomalyTriggerRequest request) {
+        Anomaly anomaly = simulationService.triggerPowerAnomaly(request);
+        return ResponseEntity.ok(ApiResponse.success(anomaly, "발전량 이상 시나리오가 성공적으로 트리거되었습니다."));
     }
 
-    @Operation(summary = "▶️ 시나리오 2: 발전량 저하 (단순 경고)", description = "발전량이 18% 저하되어 대시보드에 경고만 표시되는 시나리오를 실행합니다.")
-    @PostMapping("/scenarios/power-medium")
+    @Operation(summary = "▶️ 시나리오 3: 패널 이상 감지 (비전 AI)")
+    @PostMapping("/trigger-vision-anomaly")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<String>> triggerScenarioPowerMedium() {
-        PowerAnomalyTriggerRequest request = PowerAnomalyTriggerRequest.builder()
-                .plantId(1L)
-                .anomalySeverity("MEDIUM")
-                .differencePercentage(18.0)
-                .durationHours(2)
-                .description("시나리오 2: 패널 오염으로 인한 점진적 발전량 저하")
-                .build();
-        simulationService.triggerPowerAnomaly(request);
-        return ResponseEntity.ok(ApiResponse.success("시나리오 2 (발전량 저하)가 성공적으로 트리거되었습니다."));
+    public ResponseEntity<ApiResponse<Anomaly>> triggerVisionAnomaly(@RequestBody VisionAnomalyTriggerRequest request) {
+        Anomaly anomaly = simulationService.triggerVisionAnomaly(request);
+        return ResponseEntity.ok(ApiResponse.success(anomaly, "비전 이상 시나리오가 성공적으로 트리거되었습니다."));
     }
-
-    @Operation(summary = "▶️ 시나리오 3: 패널 크랙 감지 (긴급 알림 O)", description = "드론이 패널 파손을 발견하여 즉시 이메일 알림이 발송되는 시나리오를 실행합니다.")
-    @PostMapping("/scenarios/vision-crack")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<String>> triggerScenarioVisionCrack() {
-        VisionAnomalyTriggerRequest request = VisionAnomalyTriggerRequest.builder()
-                .plantId(1L)
-                .anomalyType("CRACK")
-                .anomalySeverity("HIGH")
-                .confidence(0.94)
-                .imageUrl("/images/crack.jpg") // 💡 최종 수정: 명세서에 따라 전체 경로로 수정
-                .xaiExplanation("외부 충격으로 인한 선형 크랙 감지 (우측 상단 모서리)")
-                .build();
-        simulationService.triggerVisionAnomaly(request);
-        return ResponseEntity.ok(ApiResponse.success("시나리오 3 (패널 크랙 감지)이 성공적으로 트리거되었습니다."));
-    }
-
-    @Operation(summary = "▶️ 시나리오 4: 패널 오염 감지 (단순 경고)", description = "드론이 패널 오염을 발견하여 대시보드에 경고만 표시되는 시나리오를 실행합니다.")
-    @PostMapping("/scenarios/vision-dirt")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<String>> triggerScenarioVisionDirt() {
-        VisionAnomalyTriggerRequest request = VisionAnomalyTriggerRequest.builder()
-                .plantId(1L)
-                .anomalyType("DIRT")
-                .anomalySeverity("MEDIUM")
-                .confidence(0.75)
-                .imageUrl("/images/pollution.jpg") // 💡 최종 수정: 명세서에 따라 전체 경로로 수정
-                .xaiExplanation("패널 하단부 조류 분변 및 먼지 누적 감지")
-                .build();
-        simulationService.triggerVisionAnomaly(request);
-        return ResponseEntity.ok(ApiResponse.success("시나리오 4 (패널 오염 감지)가 성공적으로 트리거되었습니다."));
-    }
-
-
-    // --- 시간 제어 및 상태 조회 API ---
 
     @Operation(summary = "가상 현재 시간 조회")
     @GetMapping("/time")

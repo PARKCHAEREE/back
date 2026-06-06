@@ -42,10 +42,9 @@ public class DashboardService {
         List<PlantFeatureLog> todayLogs = plantFeatureLogRepository
                 .findByPowerPlantIdAndMeasuredAtBetweenOrderByMeasuredAtAsc(plantId, todayStart, virtualNow);
 
-        // 💡 처방 3: '현재 발전량'을 오늘 데이터 중 가장 마지막 값으로 계산
+        // 💡 최종 수정: '현재 발전량'을 오늘 데이터 중 가장 마지막 값으로 계산
         Double currentPowerKw = todayLogs.isEmpty() ? 0.0 : 
-            todayLogs.get(todayLogs.size() - 1).getActual();
-        currentPowerKw = (currentPowerKw == null) ? 0.0 : currentPowerKw;
+            (todayLogs.get(todayLogs.size() - 1).getActual() != null ? todayLogs.get(todayLogs.size() - 1).getActual() : 0.0);
 
         double todayGenerationKwh = todayLogs.stream()
                 .mapToDouble(log -> log.getActual() != null ? log.getActual() : 0.0)
@@ -135,7 +134,6 @@ public class DashboardService {
             end = latest.getMeasuredAt();
         }
 
-        // 실측 데이터: DB에 적재된 CSV 행의 actual 컬럼을 현재 이하 구간만 조회한다.
         List<PlantFeatureLog> actualLogs = plantFeatureLogRepository
                 .findByPowerPlantIdAndMeasuredAtBetweenOrderByMeasuredAtAsc(plantId, start, end);
         if (actualLogs.isEmpty()) {
@@ -173,8 +171,6 @@ public class DashboardService {
                         .build())
                 .collect(Collectors.toList());
 
-        // 예측 데이터: 같은 CSV 기반 테이블의 prediction 컬럼을 미래 구간까지 조회한다.
-        // 대시보드는 이 값을 먼저 깔아두고, actualSeries가 시간이 흐르며 그 궤적을 따라오는지 보여준다.
         LocalDateTime forecastEnd = end.plusHours(futureHours != null ? futureHours : 72);
         if (forecastEnd.isAfter(latest.getMeasuredAt())) {
             forecastEnd = latest.getMeasuredAt();
@@ -187,12 +183,10 @@ public class DashboardService {
                         .build())
                 .collect(Collectors.toList());
 
-        // 차이 계산: 현재 이하 구간에서 같은 CSV 행의 prediction과 actual을 비교한다.
         List<GapDto> gapSeries = actualLogs.stream()
                 .map(log -> new GapDto(log.getMeasuredAt(), log.getPrediction(), log.getActual()))
                 .collect(Collectors.toList());
 
-        // 이상 탐지 마커: [start, end] 범위
         List<Anomaly> anomalyLogs = anomalyRepository.findByPowerPlantIdAndDetectedAtBetweenOrderByDetectedAtAsc(plantId, start, end);
         List<DashboardTimelineResponse.AnomalyMarker> anomalyMarkers = anomalyLogs.stream()
                 .map(log -> DashboardTimelineResponse.AnomalyMarker.builder()
