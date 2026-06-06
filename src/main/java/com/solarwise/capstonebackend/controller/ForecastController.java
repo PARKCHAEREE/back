@@ -5,6 +5,7 @@ import com.solarwise.capstonebackend.dto.ForecastExplanationDto;
 import com.solarwise.capstonebackend.dto.ForecastResponseDto;
 import com.solarwise.capstonebackend.event.ForecastGenerationEvent;
 import com.solarwise.capstonebackend.service.ForecastService;
+import com.solarwise.capstonebackend.service.SimulationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -25,12 +26,14 @@ public class ForecastController {
 
     private final ForecastService forecastService;
     private final ApplicationEventPublisher eventPublisher;
+    private final SimulationService simulationService; // SimulationService 주입
 
-    @Operation(summary = "AI 기반 예측 데이터 생성 요청", description = "AI에게 예측 데이터 생성을 요청하는 이벤트를 발행합니다.")
+    @Operation(summary = "AI 기반 예측 데이터 생성 요청 (수동)", description = "현재 가상 시간을 기준으로 AI에게 예측 데이터 생성을 요청하는 이벤트를 발행합니다.")
     @PostMapping("/generate")
     public ResponseEntity<ApiResponse<String>> generateForecasts(@PathVariable Long plantId) {
-        // 💡 오류 해결: targetTime 인자 추가
-        eventPublisher.publishEvent(new ForecastGenerationEvent(this, plantId, LocalDateTime.now()));
+        // 💡 요구사항 해결: 현재 가상 시간을 기준으로 이벤트 발행
+        LocalDateTime forecastTime = simulationService.getVirtualCurrentTime();
+        eventPublisher.publishEvent(new ForecastGenerationEvent(this, plantId, forecastTime));
         return ResponseEntity.ok(ApiResponse.success("AI 예측 데이터 생성 요청이 전달되었습니다."));
     }
 

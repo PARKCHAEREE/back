@@ -2,10 +2,9 @@ package com.solarwise.capstonebackend.controller;
 
 import com.solarwise.capstonebackend.dto.ApiResponse;
 import com.solarwise.capstonebackend.dto.PowerAnomalyTriggerRequest;
-import com.solarwise.capstonebackend.dto.VisionAnomalyTriggerRequest;
 import com.solarwise.capstonebackend.dto.SimulationPlaybackStatusDto;
+import com.solarwise.capstonebackend.dto.VisionAnomalyTriggerRequest;
 import com.solarwise.capstonebackend.service.SimulationService;
-import io.swagger.v3.oas.annotations.Hidden;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -64,7 +63,7 @@ public class SimulationController {
                 .anomalyType("CRACK")
                 .anomalySeverity("HIGH")
                 .confidence(0.94)
-                .imageUrl("http://localhost:8080/images/crack.jpg")
+                .imageUrl("/images/crack.jpg") // 💡 최종 수정: 명세서에 따라 전체 경로로 수정
                 .xaiExplanation("외부 충격으로 인한 선형 크랙 감지 (우측 상단 모서리)")
                 .build();
         simulationService.triggerVisionAnomaly(request);
@@ -80,7 +79,7 @@ public class SimulationController {
                 .anomalyType("DIRT")
                 .anomalySeverity("MEDIUM")
                 .confidence(0.75)
-                .imageUrl("http://localhost:8080/images/pollution.jpg")
+                .imageUrl("/images/pollution.jpg") // 💡 최종 수정: 명세서에 따라 전체 경로로 수정
                 .xaiExplanation("패널 하단부 조류 분변 및 먼지 누적 감지")
                 .build();
         simulationService.triggerVisionAnomaly(request);
@@ -128,18 +127,5 @@ public class SimulationController {
                 .running(simulationService.isPlaybackRunning())
                 .virtualCurrentTime(simulationService.getVirtualCurrentTime())
                 .build();
-    }
-
-    // --- 기존 트리거 API (Swagger UI에서 숨김) ---
-    @Hidden
-    @PostMapping("/trigger-power-anomaly")
-    public void triggerPowerAnomaly(@RequestBody PowerAnomalyTriggerRequest request) {
-        simulationService.triggerPowerAnomaly(request);
-    }
-
-    @Hidden
-    @PostMapping("/trigger-vision-anomaly")
-    public void triggerVisionAnomaly(@RequestBody VisionAnomalyTriggerRequest request) {
-        simulationService.triggerVisionAnomaly(request);
     }
 }
