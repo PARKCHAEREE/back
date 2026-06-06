@@ -13,6 +13,7 @@ import com.solarwise.capstonebackend.service.SimulationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -98,22 +99,21 @@ class SimulationServiceTest {
 
         LocalDateTime anomalyStart = LocalDateTime.of(2026, 3, 15, 18, 0);
         LocalDateTime anomalyEnd = LocalDateTime.of(2026, 3, 15, 19, 0);
+        PlantFeatureLog firstFutureLog = PlantFeatureLog.builder()
+                .powerPlantId(1L)
+                .measuredAt(anomalyStart)
+                .prediction(100.0)
+                .actual(100.0)
+                .build();
+        PlantFeatureLog secondFutureLog = PlantFeatureLog.builder()
+                .powerPlantId(1L)
+                .measuredAt(anomalyEnd)
+                .prediction(80.0)
+                .actual(80.0)
+                .build();
         when(plantFeatureLogRepository.findByPowerPlantIdAndMeasuredAtBetweenOrderByMeasuredAtAsc(
                 1L, anomalyStart, anomalyEnd))
-                .thenReturn(List.of(
-                        PlantFeatureLog.builder()
-                                .powerPlantId(1L)
-                                .measuredAt(anomalyStart)
-                                .prediction(100.0)
-                                .actual(100.0)
-                                .build(),
-                        PlantFeatureLog.builder()
-                                .powerPlantId(1L)
-                                .measuredAt(anomalyEnd)
-                                .prediction(80.0)
-                                .actual(80.0)
-                                .build()
-                ));
+                .thenReturn(List.of(firstFutureLog, secondFutureLog));
         when(plantFeatureLogRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(anomalyRepository.save(any(Anomaly.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -127,17 +127,21 @@ class SimulationServiceTest {
 
         Anomaly result = simulationService.triggerPowerAnomaly(request);
 
-        verify(plantFeatureLogRepository).saveAll(any());
+        ArgumentCaptor<List<PlantFeatureLog>> logsCaptor = ArgumentCaptor.forClass(List.class);
+        verify(plantFeatureLogRepository).saveAll(logsCaptor.capture());
+        assertThat(logsCaptor.getValue()).extracting(PlantFeatureLog::getActual)
+                .containsExactly(60.0, 48.0);
         assertThat(result.getDetectedAt()).isEqualTo(anomalyStart);
         assertThat(result.getCause()).contains("적용 건수 2");
     }
 
     @Test
     void simulateTimeProgression_doesNotAutoCreatePowerAnomaly() {
+        when(anomalyRepository.findByDetectedAtLessThanEqualAndStatus(any(), eq("OPEN"))).thenReturn(List.of());
+
         simulationService.startPlayback();
         simulationService.simulateTimeProgression();
 
-        verify(anomalyRepository, never()).existsByPowerPlantIdAndTypeAndStatus(any(), any(), any());
         verify(anomalyRepository, never()).save(any(Anomaly.class));
     }
 }

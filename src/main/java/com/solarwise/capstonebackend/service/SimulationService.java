@@ -74,7 +74,7 @@ public class SimulationService {
         Anomaly anomaly = Anomaly.builder()
                 .powerPlant(plant).type("POWER").summary("시뮬레이션 트리거: 발전량 이상")
                 .description(request.getDescription()).severity(request.getAnomalySeverity())
-                .cause(String.format("미래 데이터 조작: %.2f%% 감소", (1 - reductionFactor) * 100))
+                .cause(String.format("미래 데이터 조작: %.2f%% 감소, 적용 건수 %d", (1 - reductionFactor) * 100, targetLogs.size()))
                 .status("OPEN").detectedAt(anomalyStart).createdAt(now).updatedAt(now)
                 .build();
         return anomalyRepository.save(anomaly);

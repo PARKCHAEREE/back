@@ -22,6 +22,7 @@ public class DataInitConfig {
     private final UserRepository userRepository;
     private final PowerPlantRepository powerPlantRepository;
     private final PasswordEncoder passwordEncoder;
+    private final com.solarwise.capstonebackend.service.SimulationService simulationService;
 
     @Bean
     @Transactional
@@ -61,6 +62,13 @@ public class DataInitConfig {
                     powerPlantRepository.save(plant);
                     log.info("장항 태양광 발전소 자동 생성 완료 (KR10025001, 10,850.125kW)");
                 }
+            }
+            // 서버 시작 시 시뮬레이션 자동 재생 시작 (대시보드 타임라인 갱신 목적)
+            try {
+                simulationService.startPlayback();
+                log.info("시뮬레이션 자동 재생을 자동으로 시작했습니다.");
+            } catch (Exception e) {
+                log.warn("시뮬레이션 자동 재생 시작 중 예외 발생: {}", e.getMessage());
             }
         };
     }
