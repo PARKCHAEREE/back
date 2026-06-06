@@ -1,103 +1,69 @@
 package com.solarwise.capstonebackend.service;
 
 import com.solarwise.capstonebackend.entity.Anomaly;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.mail.MailException;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
-/**
- * 알림 서비스
- * - 이상 탐지 시 이메일 알림 발송 (네이버 SMTP 연동)
- * - 비동기 처리로 API 응답 지연 방지
- */
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class NotificationService {
 
-    @Autowired(required = false)
-    private JavaMailSender javaMailSender;
+    private final JavaMailSender javaMailSender;
 
-    // application.properties에서 네이버 아이디를 읽어옵니다.
     @Value("${spring.mail.username:}")
     private String senderUsername;
 
-    /**
-     * 이상 탐지 알림 발송 (HIGH 등급만)
-     * - 비동기 처리로 API 응답이 지연되지 않도록 함
-     * - Lazy Loading 에러 방지를 위해 이메일을 파라미터로 받음
-     *
-     * @param anomaly 이상 탐지 정보
-     * @param toEmail 수신자 이메일 주소
-     */
     @Async
     public void sendAnomalyAlert(String toEmail, Anomaly anomaly) {
+        if (anomaly == null || !"HIGH".equals(anomaly.getSeverity())) {
+            return;
+        }
+        if (toEmail == null || toEmail.trim().isEmpty()) {
+            log.warn("Anomaly ID {} has no recipient email address, skipping notification.", anomaly.getId());
+            return;
+        }
+
         try {
-            // HIGH 등급이 아니면 발송 안 함
-            if (anomaly == null || !"HIGH".equals(anomaly.getSeverity())) {
-                return;
-            }
-
-            if (toEmail == null || toEmail.trim().isEmpty()) {
-                log.warn("Anomaly ID {} has no recipient email address", anomaly.getId());
-                return;
-            }
-
-            // 네이버 SMTP 정책에 맞춘 발신자와 제목/본문 포맷
             String mailSubject = "[SOLARWISE 경고] " + anomaly.getPowerPlant().getName() + " - 이상 감지 알림";
             String mailBody = buildEmailBodyForNaver(anomaly);
-
-                        sendEmail(toEmail, mailSubject, mailBody);
-            log.info("Successfully sent anomaly alert email to {} for anomaly ID {}", toEmail, anomaly.getId());
-
+            sendEmail(toEmail, mailSubject, mailBody);
         } catch (Exception e) {
-            log.error("Failed to send anomaly alert email", e);
+            // sendEmail 내부에서 이미 예외를 처리하고 로깅하므로, 여기서는 상위 호출자에게 전파되지 않도록만 함
+            log.error("Failed to process anomaly alert for Anomaly ID {}. Error: {}", anomaly.getId(), e.getMessage());
         }
     }
 
-    /**
-     * 이메일 발송 (내부 메서드)
-     *
-     * @param to 수신자 이메일 주소
-     * @param subject 메일 제목
-     * @param body 메일 본문
-     */
     private void sendEmail(String to, String subject, String body) {
         if (javaMailSender == null) {
             log.warn("JavaMailSender not configured - skipping email send to {}", to);
             return;
         }
 
-        SimpleMailMessage message = new SimpleMailMessage();
+        try {
+            SimpleMailMessage message = new SimpleMailMessage();
+            String fromAddress = senderUsername != null && senderUsername.contains("@") ? senderUsername : senderUsername + "@naver.com";
+            
+            message.setFrom(fromAddress);
+            message.setTo(to);
+            message.setSubject(subject);
+            message.setText(body);
 
-        // 네이버 SMTP 필수 규칙: 보내는 사람은 반드시 "네이버아이디@naver.com" 형태여야 함
-        // application.properties의 spring.mail.username은 네이버 아이디만 담도록 권장합니다.
-        // 발신자 형식은 username@naver.com 으로 설정합니다.
-        String fromAddress = senderUsername != null && senderUsername.contains("@") ? senderUsername : senderUsername + "@naver.com";
-        message.setFrom(fromAddress);
-        message.setTo(to);
-        message.setSubject(subject);
-        message.setText(body);
+            javaMailSender.send(message);
+            log.info("Successfully sent email to {}", to);
 
-        javaMailSender.send(message);
+        } catch (MailException e) {
+            // ⭐️ 요구사항 해결: 메일 발송 실패가 다른 트랜잭션에 영향을 주지 않도록 예외를 여기서 처리 ⭐️
+            log.error("Failed to send email to {}. Subject: {}. Error: {}", to, subject, e.getMessage());
+        }
     }
 
-    /**
-     * 이메일 본문 구성
-     *
-     * @param anomaly 이상 탐지 정보
-     * @return 이메일 본문
-     */
-    private String buildEmailBody(Anomaly anomaly) {
-        return buildEmailBodyForNaver(anomaly);
-    }
-
-    /**
-     * 네이버 전송용 간략 텍스트 템플릿
-     */
     private String buildEmailBodyForNaver(Anomaly anomaly) {
         StringBuilder sb = new StringBuilder();
         sb.append("안녕하세요. SolarWise 알림입니다.\n\n");

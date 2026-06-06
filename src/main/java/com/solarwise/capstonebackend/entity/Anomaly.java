@@ -1,18 +1,15 @@
 package com.solarwise.capstonebackend.entity;
 
 import jakarta.persistence.*;
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 
-/**
- * 이상 탐지 엔티티
- * - AI 모델이 탐지한 이상 상황 (발전량 저하, 패널 결함, 오염도 등)
- */
 @Entity
-@Table(name = "anomalies", indexes = {
-        @Index(name = "idx_anomalies_power_plant_detected_at", columnList = "power_plant_id,detected_at")
-})
+@Table(name = "anomalies")
 @Data
 @Builder
 @NoArgsConstructor
@@ -27,53 +24,44 @@ public class Anomaly {
     @JoinColumn(name = "power_plant_id", nullable = false)
     private PowerPlant powerPlant;
 
-    @Column(nullable = false, length = 50)
+    @Column(nullable = false)
     private String type; // POWER, VISION
 
-    @Column(nullable = false, length = 255)
-    private String summary; // 요약
-
-    @Column(length = 500)
-    private String description; // 상세 설명
-
-    @Column(nullable = false, length = 50)
+    @Column(nullable = false)
     private String severity; // LOW, MEDIUM, HIGH
 
-    @Column(length = 500)
-    private String cause; // 원인
-
-    @Column(length = 500)
-    private String recommendedAction; // 권장 조치
-
-    @Column(columnDefinition = "LONGTEXT")
-    private String xaiExplanation; // SHAP/LIME 기반 설명 가능한 AI
-
-    @Column(length = 50, columnDefinition = "VARCHAR(50) DEFAULT 'OPEN'")
+    @Column(nullable = false)
     private String status; // OPEN, ACKNOWLEDGED, RESOLVED
 
     @Column(nullable = false)
     private LocalDateTime detectedAt;
 
-    @Column
     private LocalDateTime resolvedAt;
 
-    @Column(name = "created_at", nullable = false, updatable = false)
+    @Column(length = 500)
+    private String summary;
+
+    @Column(columnDefinition = "TEXT")
+    private String description;
+
+    @Column(columnDefinition = "TEXT")
+    private String cause;
+
+    @Column(columnDefinition = "TEXT")
+    private String recommendedAction;
+
+    @Column(columnDefinition = "TEXT")
+    private String xaiExplanation;
+
+    @Column(name = "image_url", length = 500) // 💡 요구사항 반영
+    private String imageUrl;
+
+    @Column(name = "heatmap_url", length = 500) // 💡 요구사항 반영
+    private String heatmapUrl;
+
+    @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    @Column(name = "updated_at")
+    @Column(nullable = false)
     private LocalDateTime updatedAt;
-
-    @PrePersist
-    protected void onCreate() {
-        // 시간 설정은 Service 계층에서 수행 (SimulationService.getVirtualCurrentTime() 사용)
-        if (status == null) {
-            status = "OPEN";
-        }
-    }
-
-    @PreUpdate
-    protected void onUpdate() {
-        // 시간 설정은 Service 계층에서 수행
-    }
-
 }

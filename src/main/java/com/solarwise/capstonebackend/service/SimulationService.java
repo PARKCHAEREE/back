@@ -34,12 +34,6 @@ public class SimulationService {
     private volatile LocalDateTime lastTickAt;
     private final Set<Long> notifiedAnomalyIds = ConcurrentHashMap.newKeySet();
 
-    // ✅ 대시보드 순환 재생을 위한 DB 데이터 시간 범위 캐시
-    private volatile LocalDateTime dataMinTime = null;
-    private volatile LocalDateTime dataMaxTime = null;
-    private volatile boolean dataRangeInitialized = false;
-    private static final Long DEFAULT_PLANT_ID = 1L; // 첫 번째 발전소 기준
-
     private final PowerPlantRepository powerPlantRepository;
     private final AnomalyRepository anomalyRepository;
     private final PlantFeatureLogRepository plantFeatureLogRepository;
@@ -47,75 +41,18 @@ public class SimulationService {
     private final VisionAnalysisRepository visionAnalysisRepository;
 
     public synchronized LocalDateTime getVirtualCurrentTime() { return virtualCurrentTime; }
-
     public synchronized void advanceTimeByHour() {
-        // ✅ 첫 호출 시 DB 데이터 범위 초기화
-        if (!dataRangeInitialized) {
-            initializeDataRange();
-        }
-
         virtualCurrentTime = virtualCurrentTime.plusHours(1);
-
-        // ✅ 순환 재생: 데이터의 끝을 초과하면 처음으로 리셋
-        if (dataMaxTime != null && virtualCurrentTime.isAfter(dataMaxTime)) {
-            if (dataMinTime != null) {
-                virtualCurrentTime = dataMinTime;
-                log.info("대시보드 순환 재생: 가상 시간이 DB 데이터 끝({})에 도달했으므로 처음({})으로 리셋",
-                        dataMaxTime, dataMinTime);
-                notifiedAnomalyIds.clear(); // 순환 시 알림 기록 초기화
-            }
-        }
-
         lastTickAt = virtualCurrentTime;
         log.info("가상 시간 1시간 전진: {}", virtualCurrentTime);
     }
-
-    /**
-     * ✅ DB 데이터의 시간 범위를 조회하여 순환 재생 경계값으로 설정
-     */
-    private synchronized void initializeDataRange() {
-        try {
-            // 첫 번째 발전소의 데이터 범위 조회
-            PlantFeatureLog minLog = plantFeatureLogRepository.findTopByPowerPlantIdOrderByMeasuredAtAsc(DEFAULT_PLANT_ID);
-            PlantFeatureLog maxLog = plantFeatureLogRepository.findTopByPowerPlantIdOrderByMeasuredAtDesc(DEFAULT_PLANT_ID);
-
-            if (minLog != null && maxLog != null) {
-                dataMinTime = minLog.getMeasuredAt();
-                dataMaxTime = maxLog.getMeasuredAt();
-                dataRangeInitialized = true;
-                log.info("✅ 대시보드 순환 재생 범위 초기화: {} ~ {} (약 {}일)",
-                        dataMinTime,
-                        dataMaxTime,
-                        (maxLog.getId() - minLog.getId()));
-            } else {
-                log.warn("⚠️ DB에 PlantFeatureLog 데이터가 없어 순환 재생 범위를 설정할 수 없습니다.");
-                dataRangeInitialized = true; // 재시도 방지
-            }
-        } catch (Exception e) {
-            log.error("❌ 대시보드 순환 재생 범위 초기화 중 오류: {}", e.getMessage(), e);
-            dataRangeInitialized = true; // 재시도 방지
-        }
-    }
-
-    public void startPlayback() {
-        playbackRunning.set(true);
-        dataRangeInitialized = false; // 재시작 시 데이터 범위 다시 초기화
-        log.info("시뮬레이션 자동 재생 시작");
-    }
+    public void startPlayback() { playbackRunning.set(true); log.info("시뮬레이션 자동 재생 시작"); }
     public void stopPlayback() { playbackRunning.set(false); log.info("시뮬레이션 자동 재생 정지"); }
     public boolean isPlaybackRunning() { return playbackRunning.get(); }
     public int getPlaybackTickSeconds() { return 1; }
     public int getPlaybackStepHours() { return 1; }
     public LocalDateTime getLastTickAt() { return lastTickAt; }
     public void triggerDroneError() { triggerNextError.set(true); log.info("드론 에러 트리거 설정됨"); }
-
-    /**
-     * ✅ 대시보드 순환 재생 상태 조회
-     */
-    public synchronized void getPlaybackStatus() {
-        log.info("대시보드 순환 재생 상태 - 현재 시간: {}, 데이터 범위: {} ~ {}",
-                virtualCurrentTime, dataMinTime, dataMaxTime);
-    }
 
     @Transactional
     public Anomaly triggerPowerAnomaly(PowerAnomalyTriggerRequest request) {

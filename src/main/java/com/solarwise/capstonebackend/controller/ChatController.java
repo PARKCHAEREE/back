@@ -25,12 +25,15 @@ public class ChatController {
 
     private final ChatService chatService;
 
-    @Operation(summary = "챗 세션 생성", description = "이상 이벤트를 기반으로 챗 세션을 시작합니다.")
+    @Operation(summary = "챗 세션 생성", description = "이상 이벤트를 기반으로 챗 세션을 시작합니다. eventId가 없으면 최근의 중요 이벤트로 자동 설정됩니다.")
     @PostMapping
     public ResponseEntity<ApiResponse<ChatSessionResponse>> createSession(
             @PathVariable Long plantId,
-            @RequestBody ChatSessionRequest request) {
-        ChatSessionResponse response = chatService.createSessionForEvent(plantId, request.getEventId());
+            @RequestBody(required = false) ChatSessionRequest request) { // 💡 처방 1: required = false
+        
+        Long eventId = (request != null) ? request.getEventId() : null;
+        
+        ChatSessionResponse response = chatService.createSessionForEvent(plantId, eventId);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success(response, "챗 세션이 생성되었습니다."));
     }
@@ -41,7 +44,16 @@ public class ChatController {
             @PathVariable Long plantId,
             @PathVariable String sessionId,
             @RequestBody ChatMessageRequest request) {
-        ChatMessageResponse response = chatService.sendMessage(sessionId, request);
+
+        Long realSessionId;
+        try {
+            String[] parts = sessionId.split("_");
+            realSessionId = Long.parseLong(parts[parts.length - 1]);
+        } catch (Exception e) {
+            throw new IllegalArgumentException("잘못된 형식의 세션 ID입니다.");
+        }
+
+        ChatMessageResponse response = chatService.sendMessage(realSessionId, request.getContent());
         return ResponseEntity.ok(ApiResponse.success(response, "답변 생성 성공"));
     }
 
@@ -57,7 +69,16 @@ public class ChatController {
     public ResponseEntity<ApiResponse<List<ChatMessageResponse>>> getMessages(
             @PathVariable Long plantId,
             @PathVariable String sessionId) {
-        List<ChatMessage> rawMessages = chatService.getMessagesBySessionId(sessionId);
+        
+        Long realSessionId;
+        try {
+            String[] parts = sessionId.split("_");
+            realSessionId = Long.parseLong(parts[parts.length - 1]);
+        } catch (Exception e) {
+            throw new IllegalArgumentException("잘못된 형식의 세션 ID입니다.");
+        }
+
+        List<ChatMessage> rawMessages = chatService.getMessagesBySessionId(realSessionId);
         List<ChatMessageResponse> responses = rawMessages.stream()
                 .map(msg -> ChatMessageResponse.builder()
                         .answer(msg.getContent())

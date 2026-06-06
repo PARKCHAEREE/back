@@ -12,6 +12,8 @@ import java.util.List;
 public class ForecastResponseDto {
     private Long plantId;
     private LocalDateTime generatedAt;
+
+    // 💡 최종 수정: 명세서(6-1)에 따라, JSON 키가 "series"가 되도록 @JsonProperty 제거
     private List<ForecastItem> series;
 
     @Data

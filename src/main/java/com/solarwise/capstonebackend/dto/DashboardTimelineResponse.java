@@ -9,9 +9,6 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 import java.util.List;
 
-/**
- * 대시보드 타임라인 통합 응답 DTO
- */
 @Data
 @Builder
 @NoArgsConstructor
@@ -20,26 +17,23 @@ public class DashboardTimelineResponse {
 
     private Long plantId;
 
-    private String range;
-
     @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss'Z'")
-    private LocalDateTime virtualNow;
+    private LocalDateTime lastUpdatedAt;
 
-    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss'Z'")
-    private LocalDateTime windowStart;
+    private List<MeasurementDto> actualSeries;
+    private List<MeasurementDto> predictionSeries;
+    private List<GapDto> gapSeries;
+    private List<AnomalyMarker> anomalyMarkers;
 
-    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss'Z'")
-    private LocalDateTime windowEnd;
-
-    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss'Z'")
-    private LocalDateTime forecastEnd;
-
-    private List<TimePointDto> actualSeries;
-
-    private List<TimePointDto> predictionSeries;
-
-    private List<GapPointDto> gapSeries;
-
-    private List<AnomalyMarkerDto> anomalyMarkers;
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class AnomalyMarker {
+        private Long eventId;
+        @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss'Z'")
+        private LocalDateTime detectedAt;
+        private String severity;
+        private String summary;
+    }
 }
-

@@ -34,7 +34,5 @@ public interface PlantFeatureLogRepository extends JpaRepository<PlantFeatureLog
 
     PlantFeatureLog findTopByPowerPlantIdOrderByMeasuredAtDesc(Long powerPlantId);
 
-    PlantFeatureLog findTopByPowerPlantIdOrderByMeasuredAtAsc(Long powerPlantId);
-
     java.util.Optional<PlantFeatureLog> findByPowerPlantIdAndMeasuredAt(Long powerPlantId, java.time.LocalDateTime measuredAt);
 }
