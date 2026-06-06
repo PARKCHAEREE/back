@@ -1,7 +1,6 @@
 package com.solarwise.capstonebackend.dto;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Builder;
 import lombok.Data;
 
@@ -14,7 +13,7 @@ public class ForecastResponseDto {
     private Long plantId;
     private LocalDateTime generatedAt;
 
-    @JsonProperty("forecast_series") // 💡 프론트엔드 에러 해결
+    // 💡 최종 수정: 명세서(6-1)에 따라, JSON 키가 "series"가 되도록 @JsonProperty 제거
     private List<ForecastItem> series;
 
     @Data

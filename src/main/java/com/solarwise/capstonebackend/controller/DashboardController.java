@@ -2,6 +2,7 @@ package com.solarwise.capstonebackend.controller;
 
 import com.solarwise.capstonebackend.dto.ApiResponse;
 import com.solarwise.capstonebackend.dto.DashboardSummaryDto;
+import com.solarwise.capstonebackend.dto.DashboardTimelineResponse;
 import com.solarwise.capstonebackend.dto.MeasurementSeriesDto;
 import com.solarwise.capstonebackend.service.DashboardService;
 import com.solarwise.capstonebackend.service.MeasurementService;
@@ -17,7 +18,7 @@ import java.time.LocalDateTime;
 
 @Tag(name = "Dashboard", description = "대시보드 관련 API")
 @RestController
-@RequestMapping("/api/v1/plants/{plantId}") // 👈 기본 경로를 /dashboard 없이 /plants/{plantId}로 변경
+@RequestMapping("/api/v1/plants/{plantId}") // 💡 최종 수정: 공통 경로로 변경
 @RequiredArgsConstructor
 public class DashboardController {
 
@@ -25,7 +26,7 @@ public class DashboardController {
     private final MeasurementService measurementService;
 
     @Operation(summary = "대시보드 요약 조회", description = "현재 발전 상태, 금일 발전량, 최근 이상 여부를 조회합니다.")
-    @GetMapping("/dashboard/summary") // 👈 세부 경로로 /dashboard/summary 지정
+    @GetMapping("/dashboard/summary")
     public ResponseEntity<ApiResponse<DashboardSummaryDto>> getDashboardSummary(
             @PathVariable Long plantId,
             @AuthenticationPrincipal Long userId) {
@@ -33,8 +34,20 @@ public class DashboardController {
         return ResponseEntity.ok(ApiResponse.success(summary, "대시보드 요약 조회 성공"));
     }
 
+    @Operation(summary = "대시보드 타임라인 조회", description = "실측/예측/이상징후 데이터를 종합적으로 조회합니다.")
+    @GetMapping("/dashboard/timeline")
+    public ResponseEntity<ApiResponse<DashboardTimelineResponse>> getDashboardTimeline(
+            @PathVariable Long plantId,
+            @AuthenticationPrincipal Long userId,
+            @RequestParam(defaultValue = "DAY") String range,
+            @RequestParam(required = false) Integer futureHours,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to) {
+        DashboardTimelineResponse timeline = dashboardService.getDashboardTimeline(plantId, userId, range, futureHours, to);
+        return ResponseEntity.ok(ApiResponse.success(timeline, "대시보드 타임라인 조회 성공"));
+    }
+
     @Operation(summary = "실측 발전량 시계열 조회", description = "실시간/기간별 발전량 그래프용 데이터를 조회합니다.")
-    @GetMapping("/measurements") // 👈 명세서에 따라 /measurements 경로 추가
+    @GetMapping("/measurements") // 💡 최종 수정: 삭제되었던 API 완벽 복원
     public ResponseEntity<ApiResponse<MeasurementSeriesDto>> getMeasurements(
             @PathVariable Long plantId,
             @AuthenticationPrincipal Long userId,

@@ -47,7 +47,6 @@ public class SimulationService {
     public synchronized LocalDateTime getVirtualCurrentTime() { return virtualCurrentTime; }
 
     public synchronized void advanceTimeByHour() {
-        // 💡 최종 수정: 시간 경계를 넘기 전에 확인하고 리셋하는 방식으로 변경
         LocalDateTime nextTime = virtualCurrentTime.plusHours(1);
         if (nextTime.isAfter(SIMULATION_END_TIME)) {
             virtualCurrentTime = SIMULATION_START_TIME;
@@ -68,53 +67,58 @@ public class SimulationService {
     public Anomaly triggerPowerAnomaly(PowerAnomalyTriggerRequest request) {
         PowerPlant plant = powerPlantRepository.findById(request.getPlantId())
                 .orElseThrow(() -> new IllegalArgumentException("발전소를 찾을 수 없습니다. ID: " + request.getPlantId()));
+        
         LocalDateTime now = getVirtualCurrentTime();
-        int durationHours = request.getDurationHours() == null ? 2 : Math.max(1, request.getDurationHours());
-        double reductionFactor = Math.max(0.0, 1.0 - ((request.getDifferencePercentage() == null ? 30.0 : request.getDifferencePercentage()) / 100.0));
-        LocalDateTime anomalyStart = now.plusHours(5);
-        LocalDateTime anomalyEnd = anomalyStart.plusHours(durationHours - 1L);
-
-        List<PlantFeatureLog> targetLogs = plantFeatureLogRepository.findByPowerPlantIdAndMeasuredAtBetweenOrderByMeasuredAtAsc(plant.getId(), anomalyStart, anomalyEnd);
-        for (PlantFeatureLog log : targetLogs) {
-            Double baseline = log.getPrediction() != null ? log.getPrediction() : log.getActual();
-            if (baseline != null) log.setActual(baseline * reductionFactor);
-        }
-        plantFeatureLogRepository.saveAll(targetLogs);
-
+        
         Anomaly anomaly = Anomaly.builder()
-                .powerPlant(plant).type("POWER").summary("시뮬레이션 트리거: 발전량 이상")
-                .description(request.getDescription()).severity(request.getAnomalySeverity())
-                .cause(String.format("미래 데이터 조작: %.2f%% 감소", (1 - reductionFactor) * 100))
-                .status("OPEN").detectedAt(anomalyStart).createdAt(now).updatedAt(now)
+                .powerPlant(plant)
+                .type("POWER")
+                .severity(request.getAnomalySeverity())
+                .status("OPEN")
+                .summary(String.format("예상 대비 발전량 %.1f%% 변동", request.getDifferencePercentage()))
+                .description(request.getDescription())
+                .detectedAt(now) // 💡 현재 가상 시간으로 감지
+                .createdAt(now)
+                .updatedAt(now)
                 .build();
-        return anomalyRepository.save(anomaly);
+            
+        Anomaly savedAnomaly = anomalyRepository.save(anomaly);
+        
+        if ("HIGH".equals(request.getAnomalySeverity())) {
+            notificationService.sendAnomalyAlert(plant.getUser().getEmail(), savedAnomaly);
+        }
+        return savedAnomaly;
     }
 
     @Transactional
     public Anomaly triggerVisionAnomaly(VisionAnomalyTriggerRequest request) {
         PowerPlant plant = powerPlantRepository.findById(request.getPlantId())
                 .orElseThrow(() -> new IllegalArgumentException("발전소를 찾을 수 없습니다. ID: " + request.getPlantId()));
+        
         LocalDateTime now = getVirtualCurrentTime();
+        
+        String severity = ("CRACK".equals(request.getAnomalyType()) || request.getConfidence() >= 0.9) 
+                          ? "HIGH" : "MEDIUM";
 
         Anomaly anomaly = Anomaly.builder()
-                .powerPlant(plant).type("VISION").summary("시뮬레이션 트리거: 비전 이상")
-                .description(request.getXaiExplanation()).severity(request.getAnomalySeverity())
-                .cause(String.format("유형: %s, 신뢰도: %.2f", request.getAnomalyType(), request.getConfidence()))
-                .status("OPEN").detectedAt(now).createdAt(now).updatedAt(now)
-                .build();
-        Anomaly saved = anomalyRepository.save(anomaly);
-
-        VisionAnalysis visionAnalysis = VisionAnalysis.builder()
-                .anomaly(saved).imageUrl(request.getImageUrl())
-                .analysisResult(String.format("type:%s, confidence:%.2f", request.getAnomalyType(), request.getConfidence()))
-                .createdAt(now).build();
-        visionAnalysisRepository.save(visionAnalysis);
-
-        if ("HIGH".equalsIgnoreCase(request.getAnomalySeverity())) {
-            String ownerEmail = plant.getUser().getEmail();
-            notificationService.sendAnomalyAlert(ownerEmail, saved);
+            .powerPlant(plant)
+            .type("VISION")
+            .severity(severity)
+            .status("OPEN")
+            .summary(String.format("비전 AI 감지: %s (신뢰도 %.1f%%)", request.getAnomalyType(), request.getConfidence() * 100))
+            .description(request.getXaiExplanation())
+            .detectedAt(now)
+            .imageUrl(request.getImageUrl()) // 💡 프론트에서 온 원본 이미지 저장
+            .createdAt(now)
+            .updatedAt(now)
+            .build();
+            
+        Anomaly savedAnomaly = anomalyRepository.save(anomaly);
+        
+        if ("HIGH".equals(severity)) {
+            notificationService.sendAnomalyAlert(plant.getUser().getEmail(), savedAnomaly);
         }
-        return saved;
+        return savedAnomaly;
     }
 
     @Scheduled(fixedRate = 3600000) // 1시간에 한번
