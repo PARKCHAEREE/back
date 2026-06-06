@@ -8,5 +8,5 @@ import java.util.List;
 
 @Repository
 public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> {
-    List<ChatMessage> findByChatSessionIdOrderByCreatedAtAsc(String sessionId);
+    List<ChatMessage> findByChatSessionIdOrderByCreatedAtAsc(Long sessionId); // Long으로 복원
 }

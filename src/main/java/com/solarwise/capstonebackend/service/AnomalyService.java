@@ -1,137 +1,105 @@
 package com.solarwise.capstonebackend.service;
 
 import com.solarwise.capstonebackend.dto.AnomalyDto;
-import com.solarwise.capstonebackend.dto.UpdateAnomalyStatusResponse;
 import com.solarwise.capstonebackend.entity.Anomaly;
-import com.solarwise.capstonebackend.entity.PowerPlant;
-import com.solarwise.capstonebackend.exception.BusinessException;
+import com.solarwise.capstonebackend.entity.VisionAnalysis;
 import com.solarwise.capstonebackend.exception.ResourceNotFoundException;
 import com.solarwise.capstonebackend.repository.AnomalyRepository;
-import com.solarwise.capstonebackend.repository.PowerPlantRepository;
+import com.solarwise.capstonebackend.repository.VisionAnalysisRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
-/**
- * 이상 탐지 서비스
- * - AI 결과 기반 이상 탐지 및 관리
- * - XAI 설명 매핑
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class AnomalyService {
 
     private final AnomalyRepository anomalyRepository;
-    private final PowerPlantRepository powerPlantRepository;
-    private final SimulationService simulationService;
+    private final VisionAnalysisRepository visionAnalysisRepository;
+    private final AiIntegrationService aiIntegrationService;
 
-    /**
-     * 최근 이상 탐지 조회
-     */
-    public List<AnomalyDto> getRecentAnomalies(Long powerPlantId, Long userId, int limit) {
-        validatePlantAccess(powerPlantId, userId);
+    @Value("${ai.server.base-url}")
+    private String aiServerBaseUrl;
 
-        return anomalyRepository.findByPowerPlantIdOrderByDetectedAtDesc(powerPlantId)
-                .stream()
-                .limit(limit)
-                .map(this::entityToDto)
+    @Transactional(readOnly = true)
+    public List<AnomalyDto> getAnomalyList(Long plantId) {
+        return anomalyRepository.findByPowerPlantIdOrderByDetectedAtDesc(plantId).stream()
+                .map(anomaly -> toDto(anomaly, null, null))
                 .collect(Collectors.toList());
     }
 
-    /**
-     * 최근 이상 탐지 조회 (내부 서비스용)
-     */
-    public List<AnomalyDto> getRecentAnomalies(Long powerPlantId, int limit) {
-        return anomalyRepository.findByPowerPlantIdOrderByDetectedAtDesc(powerPlantId)
-                .stream()
-                .limit(limit)
-                .map(this::entityToDto)
-                .collect(Collectors.toList());
-    }
+    @Transactional(readOnly = true)
+    public AnomalyDto getAnomalyDetailWithAi(Long eventId) {
+        Anomaly anomaly = anomalyRepository.findById(eventId)
+                .orElseThrow(() -> new ResourceNotFoundException("이벤트를 찾을 수 없습니다. ID: " + eventId));
 
-    /**
-     * 이상 이벤트 상세 조회
-     */
-    public AnomalyDto getAnomalyDetail(Long powerPlantId, Long eventId, Long userId) {
-        validatePlantAccess(powerPlantId, userId);
+        // 'VISION' 타입 이상 이벤트에 대해서만 AI 분석을 시도
+        if ("VISION".equals(anomaly.getType())) {
+            Optional<VisionAnalysis> visionAnalysisOpt = visionAnalysisRepository.findByAnomalyId(eventId);
 
-        Anomaly anomaly = anomalyRepository.findByIdAndPowerPlantId(eventId, powerPlantId)
-                .orElseThrow(() -> new ResourceNotFoundException("이상 이벤트를 찾을 수 없습니다."));
+            // VisionAnalysis 데이터가 존재하고, 이미지 URL이 있을 경우에만 AI 분석 요청
+            if (visionAnalysisOpt.isPresent() && visionAnalysisOpt.get().getImageUrl() != null) {
+                VisionAnalysis visionAnalysis = visionAnalysisOpt.get();
+                String imageUrl = visionAnalysis.getImageUrl();
+                
+                // 💡 경로 문제 해결: 순수한 파일 이름만 추출 (예: /images/crack.jpg -> crack.jpg)
+                String imageFileName = imageUrl.substring(imageUrl.lastIndexOf('/') + 1);
 
-        return entityToDto(anomaly);
-    }
+                try {
+                    Map<String, Object> aiResult = aiIntegrationService
+                            .requestAnomalyDetail(anomaly.getPowerPlant().getId(), imageFileName)
+                            .join();
 
-    /**
-     * 이상 이벤트 상태 변경
-     */
-    @Transactional
-    public UpdateAnomalyStatusResponse updateAnomalyStatus(Long powerPlantId, Long eventId, Long userId, String status) {
-        validatePlantAccess(powerPlantId, userId);
+                    String relativeUrl = (String) aiResult.get("heatmap_url");
+                    String absoluteHeatmapUrl = null;
+                    if (relativeUrl != null && !relativeUrl.isBlank()) {
+                        absoluteHeatmapUrl = aiServerBaseUrl + relativeUrl;
+                    }
 
-        Anomaly anomaly = anomalyRepository.findByIdAndPowerPlantId(eventId, powerPlantId)
-                .orElseThrow(() -> new ResourceNotFoundException("이상 이벤트를 찾을 수 없습니다."));
+                    return toDto(anomaly, aiResult, absoluteHeatmapUrl);
 
-        String normalizedStatus = normalizeStatus(status);
-        validateSupportedStatus(normalizedStatus);
-
-        anomaly.setStatus(normalizedStatus);
-        if ("RESOLVED".equals(normalizedStatus)) {
-            // 테스트 환경에서는 simulationService가 Mockito에 의해 주입되지 않을 수 있으므로
-            // NullPointerException을 피하기 위해 null 검사 후 대체값을 사용합니다.
-            LocalDateTime resolvedAt = simulationService != null ? simulationService.getVirtualCurrentTime() : LocalDateTime.now();
-            anomaly.setResolvedAt(resolvedAt);
-        } else {
-            anomaly.setResolvedAt(null);
+                } catch (Exception e) {
+                    log.error("AI 분석 요청 중 오류 발생 (eventId: {}): {}", eventId, e.getMessage());
+                    // AI 분석 실패 시, DB에 저장된 정보만으로 응답
+                    return toDto(anomaly, null, null);
+                }
+            }
         }
-
-        Anomaly updatedAnomaly = anomalyRepository.save(anomaly);
-        return UpdateAnomalyStatusResponse.builder()
-                .eventId(updatedAnomaly.getId())
-                .status(normalizeStatus(updatedAnomaly.getStatus()))
-                .build();
+        
+        // VISION 타입이 아니거나, VisionAnalysis 데이터가 없는 경우 DB 정보만 반환
+        return toDto(anomaly, null, null);
     }
 
-    /**
-     * 엔티티를 DTO로 변환
-     */
-    private AnomalyDto entityToDto(Anomaly anomaly) {
-        return AnomalyDto.builder()
+    private AnomalyDto toDto(Anomaly anomaly, Map<String, Object> aiResult, String heatmapUrl) {
+        AnomalyDto.AnomalyDtoBuilder builder = AnomalyDto.builder()
                 .eventId(anomaly.getId())
+                .plantId(anomaly.getPowerPlant().getId())
                 .type(anomaly.getType())
                 .severity(anomaly.getSeverity())
                 .detectedAt(anomaly.getDetectedAt())
                 .summary(anomaly.getSummary())
-                .status(normalizeStatus(anomaly.getStatus()))
-                .cause(anomaly.getCause())
-                .recommendedAction(anomaly.getRecommendedAction())
-                .xaiExplanation(anomaly.getXaiExplanation())
-                .build();
-    }
+                .status(anomaly.getStatus());
 
-    private PowerPlant validatePlantAccess(Long powerPlantId, Long userId) {
-        return powerPlantRepository.findByIdAndUserId(powerPlantId, userId)
-                .orElseThrow(() -> new ResourceNotFoundException("발전소를 찾을 수 없습니다."));
-    }
-
-    private void validateSupportedStatus(String status) {
-        if (!"OPEN".equals(status) && !"ACKNOWLEDGED".equals(status) && !"RESOLVED".equals(status)) {
-            throw new BusinessException("지원하지 않는 이상 이벤트 상태입니다.", HttpStatus.BAD_REQUEST);
+        if (aiResult != null) {
+            builder.cause((String) aiResult.get("cause"))
+                   .recommendedAction((String) aiResult.get("recommendation"));
+        } else {
+            // AI 분석 결과가 없으면, DB에 저장된 값을 사용
+            builder.cause(anomaly.getCause())
+                   .recommendedAction(anomaly.getRecommendedAction());
         }
+        
+        // 프론트엔드 구현 전까지 히트맵 URL은 null로 유지
+        // builder.heatmapUrl(heatmapUrl);
+        
+        return builder.build();
     }
-
-    private String normalizeStatus(String status) {
-        if (status == null || status.isBlank() || "DETECTED".equals(status)) {
-            return "OPEN";
-        }
-        return status;
-    }
-
 }
-

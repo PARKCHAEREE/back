@@ -70,8 +70,8 @@ public class AiIntegrationService {
     }
 
     @Async
-    public CompletableFuture<Map> requestPowerForecast(Long plantId) {
-        return callAiServer("power/forecast", buildAiPredictionRequest(plantId), Map.class);
+    public CompletableFuture<Map> requestPowerForecast(Long plantId, LocalDateTime targetTime) {
+        return callAiServer("power/forecast", buildAiPredictionRequest(plantId, targetTime), Map.class);
     }
 
     @Async
@@ -88,6 +88,7 @@ public class AiIntegrationService {
             bodyBuilder.part("power_data", powerDataJson);
             bodyBuilder.part("gemini_enabled", String.valueOf(geminiEnabled));
             if (imageFileName != null && !imageFileName.isEmpty()) {
+                // 💡 경로 문제 해결: 'images/' 접두사를 붙여 ClassPathResource를 생성
                 bodyBuilder.part("panel_image", new ClassPathResource("images/" + imageFileName));
             }
             return webClient.post()
@@ -123,8 +124,7 @@ public class AiIntegrationService {
             if (signal.totalRetries() >= MAX_RETRIES) {
                 return Mono.error(new BusinessException("최대 재시도 횟수(" + MAX_RETRIES + "회)를 초과했습니다.", HttpStatus.INTERNAL_SERVER_ERROR));
             }
-            if (throwable instanceof WebClientResponseException) {
-                WebClientResponseException ex = (WebClientResponseException) throwable;
+            if (throwable instanceof WebClientResponseException ex) {
                 HttpStatusCode status = ex.getStatusCode();
                 if (status.value() == 429) {
                     Duration delay = extractRetryDelay(ex);
@@ -146,9 +146,7 @@ public class AiIntegrationService {
         if (retryAfterHeader != null && !retryAfterHeader.isEmpty()) {
             try {
                 return Duration.ofSeconds(Long.parseLong(retryAfterHeader.get(0)));
-            } catch (NumberFormatException e) {
-                log.warn("잘못된 Retry-After 헤더 값: {}", retryAfterHeader.get(0));
-            }
+            } catch (NumberFormatException e) { log.warn("잘못된 Retry-After 헤더 값: {}", retryAfterHeader.get(0)); }
         }
         String responseBody = ex.getResponseBodyAsString();
         if (responseBody != null) {
@@ -156,11 +154,8 @@ public class AiIntegrationService {
             Matcher matcher = pattern.matcher(responseBody);
             if (matcher.find()) {
                 try {
-                    double seconds = Double.parseDouble(matcher.group(1));
-                    return Duration.ofMillis((long) (seconds * 1000));
-                } catch (NumberFormatException e) {
-                    log.warn("응답 본문에서 지연 시간 파싱 실패: {}", matcher.group(1));
-                }
+                    return Duration.ofMillis((long) (Double.parseDouble(matcher.group(1)) * 1000));
+                } catch (NumberFormatException e) { log.warn("응답 본문에서 지연 시간 파싱 실패: {}", matcher.group(1)); }
             }
         }
         return INITIAL_BACKOFF;
@@ -212,17 +207,16 @@ public class AiIntegrationService {
         return objectMapper.writeValueAsString(powerData);
     }
 
-    private AiPredictionRequest buildAiPredictionRequest(Long plantId) {
+    private AiPredictionRequest buildAiPredictionRequest(Long plantId, LocalDateTime targetTime) {
         PowerPlant plant = powerPlantRepository.findById(plantId)
                 .orElseThrow(() -> new IllegalArgumentException("발전소를 찾을 수 없습니다. ID: " + plantId));
-        LocalDateTime now = simulationService.getVirtualCurrentTime();
         List<HistoryDataDto> history = new ArrayList<>();
-        history.add(HistoryDataDto.builder().timestamp(now.minusHours(1)).actualPowerKw(50.0).build());
+        history.add(HistoryDataDto.builder().timestamp(targetTime.minusHours(1)).actualPowerKw(50.0).build());
         List<WeatherForecastDto> weatherForecast = new ArrayList<>();
-        weatherForecast.add(WeatherForecastDto.builder().forecastTime(now).irradiation(800.0).ambientTemperature(25.0).build());
+        weatherForecast.add(WeatherForecastDto.builder().forecastTime(targetTime).irradiation(800.0).ambientTemperature(25.0).build());
         return AiPredictionRequest.builder()
                 .plantId("PLANT_" + String.format("%03d", plant.getId()))
-                .requestedAt(now)
+                .requestedAt(targetTime)
                 .history(history)
                 .weatherForecast(weatherForecast)
                 .build();
