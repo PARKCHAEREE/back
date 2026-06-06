@@ -1,6 +1,7 @@
 package com.solarwise.capstonebackend.entity;
 
 import jakarta.persistence.*;
+import jakarta.persistence.Index;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -9,7 +10,9 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "anomalies")
+@Table(name = "anomalies", indexes = {
+        @Index(name = "idx_powerplant_detectedat", columnList = "power_plant_id, detected_at")
+})
 @Data
 @Builder
 @NoArgsConstructor

@@ -33,13 +33,14 @@ public class UserController {
     @PreAuthorize("isAuthenticated()")
     @Operation(summary = "내 정보 조회", description = "로그인한 사용자의 정보 조회")
     public ResponseEntity<ApiResponse<UserResponse>> getMe() {
-        String userId = (String) SecurityContextHolder.getContext()
+        Object principal = SecurityContextHolder.getContext()
                 .getAuthentication()
                 .getPrincipal();
+        Long userId = Long.parseLong(principal.toString());
 
         log.info("내 정보 조회: userId={}", userId);
 
-        UserResponse response = authService.getUserInfo(Long.parseLong(userId));
+        UserResponse response = authService.getUserInfo(userId);
         return ResponseEntity.ok(ApiResponse.success(response, "사용자 정보 조회 성공"));
     }
 

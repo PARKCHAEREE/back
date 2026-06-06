@@ -34,7 +34,10 @@ public class DashboardController {
         return ResponseEntity.ok(ApiResponse.success(summary, "대시보드 요약 조회 성공"));
     }
 
-    @Operation(summary = "대시보드 타임라인 조회", description = "실측/예측/이상징후 데이터를 종합적으로 조회합니다.")
+    @Operation(
+            summary = "대시보드 타임라인 조회",
+            description = "DB에 적재된 CSV 행을 가상 현재 시간 기준 슬라이딩 윈도우로 조회해 실측/예측/괴리/이상 마커를 반환합니다. 화면 시간은 DB의 시간 컬럼을 그대로 사용합니다."
+    )
     @GetMapping("/dashboard/timeline")
     public ResponseEntity<ApiResponse<DashboardTimelineResponse>> getDashboardTimeline(
             @PathVariable Long plantId,

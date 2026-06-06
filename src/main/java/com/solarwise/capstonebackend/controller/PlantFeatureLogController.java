@@ -57,8 +57,9 @@ public class PlantFeatureLogController {
     )
     public ResponseEntity<ApiResponse<Map<String, Object>>> getFeatureLogCount(
             @PathVariable Long plantId) {
-        String userId = (String) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        long count = plantFeatureLogService.getFeatureLogCount(plantId, Long.parseLong(userId));
+        Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        Long userId = Long.parseLong(principal.toString());
+        long count = plantFeatureLogService.getFeatureLogCount(plantId, userId);
 
         return ResponseEntity.ok(ApiResponse.success(
                 Map.of("plantId", plantId, "count", count),
@@ -88,14 +89,15 @@ public class PlantFeatureLogController {
             @PathVariable Long plantId,
             @RequestParam(defaultValue = "24") int limit) {
 
-        String userId = (String) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        Long userId = Long.parseLong(principal.toString());
         LocalDateTime virtualNow = simulationService.getVirtualCurrentTime();
 
         log.info("최신 피처 로그 조회: plantId={}, userId={}, limit={}, virtualNow={}",
                 plantId, userId, limit, virtualNow);
 
         PlantFeatureLogSeriesDto response = plantFeatureLogService.getLatestFeatureLogs(
-                plantId, Long.parseLong(userId), limit);
+                plantId, userId, limit);
 
         return ResponseEntity.ok(ApiResponse.success(response, "최신 피처 로그 조회 성공"));
     }
@@ -129,7 +131,8 @@ public class PlantFeatureLogController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to) {
 
-        String userId = (String) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        Long userId = Long.parseLong(principal.toString());
 
         // 🔑 가상 시간 기준으로 시간 범위 설정
         LocalDateTime virtualNow = simulationService.getVirtualCurrentTime();
@@ -141,7 +144,7 @@ public class PlantFeatureLogController {
 
         PlantFeatureLogSeriesDto response = plantFeatureLogService.getFeatureLogSeries(
                 plantId,
-                Long.parseLong(userId),
+                userId,
                 startTime,
                 endTime
         );
