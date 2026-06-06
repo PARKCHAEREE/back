@@ -1,39 +1,32 @@
 package com.solarwise.capstonebackend.dto.ai;
 
-import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.Map;
 
-/**
- * 개별 예측 포인트 DTO
- * - 발전량 예측의 각 시점에 대한 데이터
- */
 @Data
-@Builder
 @NoArgsConstructor
-@AllArgsConstructor
 public class ForecastDto {
 
+    // AI 서버의 실제 응답은 'prediction' 키 아래에 중첩된 값을 포함할 수 있음
+    // 혹은 targetTime, modelVersion 등이 상위 레벨에 있을 수 있음
+    // 로그를 기반으로 가장 유연하게 처리
+    
     @JsonProperty("target_time")
-    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
-    private LocalDateTime targetTime; // 예측 대상 시간
-
-    @JsonProperty("predicted_power_kw")
-    private Double predictedPowerKw; // 예측 발전량 (kW)
-
-    @JsonProperty("confidence")
-    private Double confidence; // 신뢰도 (0.0 ~ 1.0)
+    private LocalDateTime targetTime;
 
     @JsonProperty("model_version")
-    private String modelVersion; // 사용된 모델 버전
+    private String modelVersion;
 
-    @JsonProperty("model_notes")
-    private String modelNotes; // 모델 관련 메모
+    // 'prediction' 키가 객체일 경우를 대비
+    private Map<String, Double> prediction;
 
+    // 'prediction' 키가 단일 값일 경우를 대비
+    @JsonProperty("prediction")
+    private Double predictedPowerKw;
+
+    private Double confidence;
 }
-

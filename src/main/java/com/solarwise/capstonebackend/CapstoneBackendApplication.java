@@ -7,7 +7,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 
 @SpringBootApplication
 @EnableAsync
-@EnableScheduling
+@EnableScheduling // 💡 요구사항 해결: 스케줄링 기능 활성화
 public class CapstoneBackendApplication {
 
     public static void main(String[] args) {
