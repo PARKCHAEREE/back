@@ -3,14 +3,14 @@ package com.solarwise.capstonebackend.repository;
 import com.solarwise.capstonebackend.entity.PlantFeatureLog;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
-import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
-@Repository
+/**
+ * 발전소 고급 피처 로그 저장소
+ */
 public interface PlantFeatureLogRepository extends JpaRepository<PlantFeatureLog, Long> {
 
     long countByPowerPlantId(Long powerPlantId);
@@ -22,6 +22,7 @@ public interface PlantFeatureLogRepository extends JpaRepository<PlantFeatureLog
             LocalDateTime from,
             LocalDateTime to
     );
+    
 
     List<PlantFeatureLog> findByPowerPlantIdAndMeasuredAtLessThanEqualOrderByMeasuredAtDesc(
             Long powerPlantId,
@@ -33,7 +34,7 @@ public interface PlantFeatureLogRepository extends JpaRepository<PlantFeatureLog
 
     PlantFeatureLog findTopByPowerPlantIdOrderByMeasuredAtDesc(Long powerPlantId);
 
-    Optional<PlantFeatureLog> findByPowerPlantIdAndMeasuredAt(Long powerPlantId, LocalDateTime measuredAt);
+    PlantFeatureLog findTopByPowerPlantIdOrderByMeasuredAtAsc(Long powerPlantId);
 
-    List<PlantFeatureLog> findAllByPowerPlantIdAndMeasuredAtIn(Long powerPlantId, Collection<LocalDateTime> measuredAt);
+    java.util.Optional<PlantFeatureLog> findByPowerPlantIdAndMeasuredAt(Long powerPlantId, java.time.LocalDateTime measuredAt);
 }
