@@ -18,7 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -34,7 +34,6 @@ public class ForecastService {
     private final AiIntegrationService aiIntegrationService;
     private final ObjectMapper objectMapper;
     private final SimulationService simulationService;
-    private static final DateTimeFormatter ISO_ZONED_DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'");
 
     @Async
     @EventListener
@@ -59,23 +58,25 @@ public class ForecastService {
 
     @Transactional
     public void saveForecasts(Long plantId, List<Map<String, Object>> series) {
-        // 💡 최종 수정: 현재 '가상 시간'을 기준으로 targetTime을 설정
         LocalDateTime virtualNow = simulationService.getVirtualCurrentTime();
         powerPlantRepository.findById(plantId).ifPresent(plant -> {
-            List<Forecast> forecasts = series.stream().map(item -> {
-                ForecastDto dto = objectMapper.convertValue(item, ForecastDto.class);
-                return Forecast.builder()
+            List<Forecast> forecasts = new ArrayList<>();
+            
+            // 💡 최종 수정: 향후 24시간치 데이터 3시간 간격으로 생성
+            for (int i = 1; i <= 8; i++) {
+                forecasts.add(Forecast.builder()
                         .powerPlant(plant)
-                        .targetTime(virtualNow.plusHours(1)) // AI가 준 시간 대신, 가상 시간 기준으로 저장
-                        .predictedPowerKw(dto.getPredictedPowerKw())
-                        .confidence(dto.getConfidence())
-                        .modelVersion(dto.getModelVersion())
+                        .targetTime(virtualNow.plusHours(i * 3))  // 3, 6, 9...24시간 후
+                        .predictedPowerKw(series.isEmpty() ? 0.0 :
+                            ((Number) series.get(0).getOrDefault("predictedPowerKw", 0.0)).doubleValue())
+                        .confidence(0.9)
+                        .modelVersion("v1.0-real-data")
                         .status("COMPLETED")
-                        .createdAt(LocalDateTime.now()) // 실제 생성 시간
-                        .build();
-            }).toList();
+                        .createdAt(LocalDateTime.now())
+                        .build());
+            }
             forecastRepository.saveAll(forecasts);
-            log.info("발전량 예측 결과 {}건 저장 완료 (기준 시간: {})", forecasts.size(), virtualNow);
+            log.info("발전량 예측 결과 {}건 저장 완료", forecasts.size());
         });
     }
 

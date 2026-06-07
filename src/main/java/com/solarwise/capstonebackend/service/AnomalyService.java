@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -25,6 +26,13 @@ public class AnomalyService {
     private final AnomalyRepository anomalyRepository;
     private final VisionAnalysisRepository visionAnalysisRepository;
     private final AiIntegrationService aiIntegrationService;
+    private final SimulationService simulationService;
+
+    @Value("${server.address:localhost}")
+    private String serverAddress;
+
+    @Value("${server.port:8080}")
+    private String serverPort;
 
     @Value("${ai.server.base-url}")
     private String aiServerBaseUrl;
@@ -41,16 +49,12 @@ public class AnomalyService {
         Anomaly anomaly = anomalyRepository.findById(eventId)
                 .orElseThrow(() -> new ResourceNotFoundException("이벤트를 찾을 수 없습니다. ID: " + eventId));
 
-        // 'VISION' 타입 이상 이벤트에 대해서만 AI 분석을 시도
         if ("VISION".equals(anomaly.getType())) {
             Optional<VisionAnalysis> visionAnalysisOpt = visionAnalysisRepository.findByAnomalyId(eventId);
 
-            // VisionAnalysis 데이터가 존재하고, 이미지 URL이 있을 경우에만 AI 분석 요청
-            if (visionAnalysisOpt.isPresent() && visionAnalysisOpt.get().getImageUrl() != null) {
+            if (visionAnalysisOpt.isPresent() && visionAnalysisOpt.get().getImageUrl() != null && !visionAnalysisOpt.get().getImageUrl().isBlank()) {
                 VisionAnalysis visionAnalysis = visionAnalysisOpt.get();
                 String imageUrl = visionAnalysis.getImageUrl();
-                
-                // 💡 경로 문제 해결: 순수한 파일 이름만 추출 (예: /images/crack.jpg -> crack.jpg)
                 String imageFileName = imageUrl.substring(imageUrl.lastIndexOf('/') + 1);
 
                 try {
@@ -63,22 +67,39 @@ public class AnomalyService {
                     if (relativeUrl != null && !relativeUrl.isBlank()) {
                         absoluteHeatmapUrl = aiServerBaseUrl + relativeUrl;
                     }
-
                     return toDto(anomaly, aiResult, absoluteHeatmapUrl);
-
                 } catch (Exception e) {
                     log.error("AI 분석 요청 중 오류 발생 (eventId: {}): {}", eventId, e.getMessage());
-                    // AI 분석 실패 시, DB에 저장된 정보만으로 응답
                     return toDto(anomaly, null, null);
                 }
             }
         }
         
-        // VISION 타입이 아니거나, VisionAnalysis 데이터가 없는 경우 DB 정보만 반환
         return toDto(anomaly, null, null);
     }
 
+    @Transactional
+    public AnomalyDto updateStatus(Long eventId, String status) {
+        Anomaly anomaly = anomalyRepository.findById(eventId)
+                .orElseThrow(() -> new ResourceNotFoundException("이벤트를 찾을 수 없습니다. ID: " + eventId));
+        
+        anomaly.setStatus(status);
+        LocalDateTime now = simulationService.getVirtualCurrentTime();
+        anomaly.setUpdatedAt(now);
+        if ("RESOLVED".equals(status)) {
+            anomaly.setResolvedAt(now);
+        }
+        
+        Anomaly updatedAnomaly = anomalyRepository.save(anomaly);
+        return toDto(updatedAnomaly, null, updatedAnomaly.getHeatmapUrl());
+    }
+
     private AnomalyDto toDto(Anomaly anomaly, Map<String, Object> aiResult, String heatmapUrl) {
+        String absoluteImageUrl = null;
+        if (anomaly.getImageUrl() != null && !anomaly.getImageUrl().isBlank()) {
+            absoluteImageUrl = String.format("http://%s:%s%s", serverAddress, serverPort, anomaly.getImageUrl());
+        }
+
         AnomalyDto.AnomalyDtoBuilder builder = AnomalyDto.builder()
                 .eventId(anomaly.getId())
                 .plantId(anomaly.getPowerPlant().getId())
@@ -86,19 +107,17 @@ public class AnomalyService {
                 .severity(anomaly.getSeverity())
                 .detectedAt(anomaly.getDetectedAt())
                 .summary(anomaly.getSummary())
-                .status(anomaly.getStatus());
+                .status(anomaly.getStatus())
+                .imageUrl(absoluteImageUrl)
+                .heatmapUrl(heatmapUrl);
 
         if (aiResult != null) {
             builder.cause((String) aiResult.get("cause"))
                    .recommendedAction((String) aiResult.get("recommendation"));
         } else {
-            // AI 분석 결과가 없으면, DB에 저장된 값을 사용
             builder.cause(anomaly.getCause())
                    .recommendedAction(anomaly.getRecommendedAction());
         }
-        
-        // 프론트엔드 구현 전까지 히트맵 URL은 null로 유지
-        // builder.heatmapUrl(heatmapUrl);
         
         return builder.build();
     }
